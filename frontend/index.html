@@ -65,26 +65,25 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
         const data = await response.json();
 
-        if (response.ok) {
-
-            // Save doctor details in localStorage
-            localStorage.setItem("doctorId", data.id);
-            localStorage.setItem("doctorName", data.name);
-
-            document.getElementById("message").innerText = "Login successful";
-            document.getElementById("message").className = "text-success text-center mt-3";
-
-            // Redirect after short delay
-            setTimeout(() => {
-                window.location.href = "docDashboard.html";
-            }, 1000);
-
-        } else {
+        if (!response.ok) {
             document.getElementById("message").innerText = data.message || "Login failed";
             document.getElementById("message").className = "text-danger text-center mt-3";
+            return;
         }
 
+        // 🔥 Correct Keys (CASE SENSITIVE)
+        localStorage.setItem("doctorId", data.doctorId);
+        localStorage.setItem("doctorName", data.name);
+
+        document.getElementById("message").innerText = "Login successful";
+        document.getElementById("message").className = "text-success text-center mt-3";
+
+        setTimeout(() => {
+            window.location.href = "docDashboard.html";
+        }, 800);
+
     } catch (error) {
+        console.error(error);
         document.getElementById("message").innerText = "Server error";
         document.getElementById("message").className = "text-danger text-center mt-3";
     }

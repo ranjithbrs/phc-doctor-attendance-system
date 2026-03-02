@@ -139,9 +139,83 @@
 </div>
 
 <script>
-function logout() {
-  alert("Logout clicked (connect backend later)");
+
+// ===== Load Dashboard Data On Page Load =====
+document.addEventListener("DOMContentLoaded", function () {
+  loadSummary();
+  loadPhcOverview();
+});
+
+// ===== Load Overall Summary =====
+function loadSummary() {
+
+  fetch("http://localhost:8080/dashboard/summary")
+    .then(res => res.json())
+    .then(data => {
+
+      document.getElementById("totalPhc").innerText = data.totalPhc;
+      document.getElementById("totalDoctors").innerText = data.totalDoctors;
+      document.getElementById("presentDoctors").innerText = data.presentDoctors;
+      document.getElementById("absentDoctors").innerText = data.absentDoctors;
+
+    })
+    .catch(error => {
+      console.error("Summary load error:", error);
+    });
 }
+
+// ===== Load PHC-wise Overview =====
+function loadPhcOverview() {
+
+  fetch("http://localhost:8080/dashboard/phc-overview")
+    .then(res => res.json())
+    .then(data => {
+
+      const tableBody = document.getElementById("phcTable");
+      tableBody.innerHTML = "";
+
+      if (!data || data.length === 0) {
+        tableBody.innerHTML = `
+          <tr>
+            <td colspan="5">No PHC data available</td>
+          </tr>
+        `;
+        return;
+      }
+
+      data.forEach(phc => {
+
+        const percentage = phc.totalDoctors > 0
+          ? Math.round((phc.presentDoctors / phc.totalDoctors) * 100)
+          : 0;
+
+        let badgeColor = "bg-success";
+        if (percentage < 75) badgeColor = "bg-warning text-dark";
+        if (percentage < 50) badgeColor = "bg-danger";
+
+        tableBody.innerHTML += `
+          <tr>
+            <td>${phc.phcName}</td>
+            <td>${phc.totalDoctors}</td>
+            <td class="text-success">${phc.presentDoctors}</td>
+            <td class="text-danger">${phc.absentDoctors}</td>
+            <td><span class="badge ${badgeColor}">${percentage}%</span></td>
+          </tr>
+        `;
+      });
+
+    })
+    .catch(error => {
+      console.error("PHC overview load error:", error);
+    });
+}
+
+// ===== Logout =====
+function logout() {
+  localStorage.clear();
+  window.location.href = "index.html";
+}
+
 </script>
 
 </body>
