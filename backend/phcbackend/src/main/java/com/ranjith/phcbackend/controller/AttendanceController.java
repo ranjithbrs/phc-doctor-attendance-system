@@ -1,4 +1,5 @@
 package com.ranjith.phcbackend.controller;
+
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -29,64 +30,77 @@ public class AttendanceController {
         this.attendanceService = attendanceService;
     }
 
-    // ✅ CHECK-IN API
+    // ✅ CHECK-IN
     @PostMapping("/checkin")
     public ResponseEntity<?> checkIn(@RequestBody Map<String, Long> request) {
 
         Long doctorId = request.get("doctorId");
 
+        if (doctorId == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Doctor ID is required"));
+        }
+
         String result = attendanceService.checkIn(doctorId);
 
-        Map<String, String> response = new HashMap<>();
-        response.put("message", result);
+        return ResponseEntity.ok(Map.of("message", result));
+    }
 
-        if (result.equals("Check-in successful")) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.badRequest().body(response);
+    // ✅ CHECK-OUT
+    @PutMapping("/checkout")
+    public ResponseEntity<?> checkOut(@RequestBody Map<String, Long> request) {
+
+        Long doctorId = request.get("doctorId");
+
+        if (doctorId == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", "Doctor ID is required"));
         }
+
+        String result = attendanceService.checkOut(doctorId);
+
+        return ResponseEntity.ok(Map.of("message", result));
     }
-    // ✅ CHECK-OUT API
-@PutMapping("/checkout")
-public ResponseEntity<?> checkOut(@RequestBody Map<String, Long> request) {
 
-    Long doctorId = request.get("doctorId");
+    // ✅ TODAY STATUS
+    @GetMapping("/status/{doctorId}")
+    public ResponseEntity<?> getTodayStatus(@PathVariable Long doctorId) {
 
-    String result = attendanceService.checkOut(doctorId);
+        String status = attendanceService.getTodayStatus(doctorId);
 
-    Map<String, String> response = new HashMap<>();
-    response.put("message", result);
+        Map<String, String> response = new HashMap<>();
+        response.put("status", status);
 
-    if (result.equals("Check-out successful")) {
         return ResponseEntity.ok(response);
-    } else {
-        return ResponseEntity.badRequest().body(response);
     }
-}
-// ✅ TODAY STATUS API
-@GetMapping("/status/{doctorId}")
-public ResponseEntity<?> getTodayStatus(@PathVariable Long doctorId) {
 
-    String result = attendanceService.getTodayStatus(doctorId);
+    // ✅ HISTORY (FULL + FILTER)
+    @GetMapping("/history/{doctorId}")
+    public ResponseEntity<?> getHistory(
+            @PathVariable Long doctorId,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
 
-    Map<String, String> response = new HashMap<>();
-    response.put("status", result);
+        // If filter applied
+        if (from != null && to != null) {
 
-    return ResponseEntity.ok(response);
-}
-// ✅ ATTENDANCE HISTORY API
-@GetMapping("/history/{doctorId}")
-public ResponseEntity<?> getHistory(
-        @PathVariable Long doctorId,
-        @RequestParam String from,
-        @RequestParam String to) {
+            LocalDate startDate = LocalDate.parse(from);
+            LocalDate endDate = LocalDate.parse(to);
 
-    LocalDate startDate = LocalDate.parse(from);
-    LocalDate endDate = LocalDate.parse(to);
+            List<Attendance> filteredHistory =
+                    attendanceService.getAttendanceHistory(
+                            doctorId,
+                            startDate,
+                            endDate
+                    );
 
-    List<Attendance> history =
-            attendanceService.getAttendanceHistory(doctorId, startDate, endDate);
+            return ResponseEntity.ok(filteredHistory);
+        }
 
-    return ResponseEntity.ok(history);
-}
+        // Return full history if no filter
+        List<Attendance> fullHistory =
+                attendanceService.getFullHistory(doctorId);
+
+        return ResponseEntity.ok(fullHistory);
+    }
 }

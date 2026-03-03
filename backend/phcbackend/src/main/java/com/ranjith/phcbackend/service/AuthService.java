@@ -1,10 +1,13 @@
 package com.ranjith.phcbackend.service;
 
-import com.ranjith.phcbackend.model.Doctor;
-import com.ranjith.phcbackend.repository.DoctorRepository;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
+import com.ranjith.phcbackend.model.Doctor;
+import com.ranjith.phcbackend.repository.DoctorRepository;
 
 @Service
 public class AuthService {
@@ -15,7 +18,7 @@ public class AuthService {
         this.doctorRepository = doctorRepository;
     }
 
-    public Doctor login(String email, String password) {
+    public Map<String, Object> login(String email, String password) {
 
         Optional<Doctor> doctorOptional = doctorRepository.findByEmail(email);
 
@@ -29,6 +32,12 @@ public class AuthService {
             return null;
         }
 
-        return doctor;
+        // ✅ Return structured response
+        Map<String, Object> response = new HashMap<>();
+        response.put("doctorId", doctor.getId());
+        response.put("name", doctor.getName());
+        response.put("role", doctor.getRole());
+
+        return response;
     }
 }

@@ -1,13 +1,6 @@
 package com.ranjith.phcbackend.model;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "doctors")
@@ -26,6 +19,8 @@ public class Doctor {
 
     private String specialization;
 
+    private String role;   // ✅ ADD THIS
+
     @ManyToOne
     @JoinColumn(name = "phc_id", nullable = false)
     private PHC phc;
@@ -35,11 +30,12 @@ public class Doctor {
     }
 
     // Parameterized Constructor
-    public Doctor(String name, String email, String password, String specialization, PHC phc) {
+    public Doctor(String name, String email, String password, String specialization, String role, PHC phc) {
         this.name = name;
         this.email = email;
         this.password = password;
         this.specialization = specialization;
+        this.role = role;
         this.phc = phc;
     }
 
@@ -65,6 +61,10 @@ public class Doctor {
         return specialization;
     }
 
+    public String getRole() {     // ✅ ADD THIS
+        return role;
+    }
+
     public PHC getPhc() {
         return phc;
     }
@@ -85,6 +85,10 @@ public class Doctor {
 
     public void setSpecialization(String specialization) {
         this.specialization = specialization;
+    }
+
+    public void setRole(String role) {   // ✅ ADD THIS
+        this.role = role;
     }
 
     public void setPhc(PHC phc) {

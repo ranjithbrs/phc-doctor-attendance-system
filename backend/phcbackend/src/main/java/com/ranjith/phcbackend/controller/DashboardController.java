@@ -1,11 +1,8 @@
 package com.ranjith.phcbackend.controller;
 
-import java.util.Map;
-
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,13 +19,10 @@ public class DashboardController {
         this.dashboardService = dashboardService;
     }
 
-    // ✅ SUMMARY API
-    @GetMapping("/summary/{divisionId}")
-    public ResponseEntity<?> getSummary(@PathVariable Long divisionId) {
+    @GetMapping("/summary")
+    public ResponseEntity<?> getSummary() {
 
-        Map<String, Object> summary =
-                dashboardService.getSummary(divisionId);
-
-        return ResponseEntity.ok(summary);
+        // 🔥 Hardcoded divisionId = 1
+        return ResponseEntity.ok(dashboardService.getSummary(1L));
     }
 }

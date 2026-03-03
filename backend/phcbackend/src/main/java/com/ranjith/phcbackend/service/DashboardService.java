@@ -32,7 +32,7 @@ public class DashboardService {
 
         Map<String, Object> summary = new HashMap<>();
 
-        // Total PHCs in division
+        // ✅ Total PHCs in division
         List<PHC> phcs = phcRepository.findAll()
                 .stream()
                 .filter(phc -> phc.getDivision().getId().equals(divisionId))
@@ -40,15 +40,18 @@ public class DashboardService {
 
         int totalPhc = phcs.size();
 
-        // Total Doctors in that division
+        // ✅ Total Doctors (EXCLUDE ADMIN)
         List<Doctor> doctors = doctorRepository.findAll()
                 .stream()
-                .filter(doc -> doc.getPhc().getDivision().getId().equals(divisionId))
+                .filter(doc ->
+                        doc.getPhc().getDivision().getId().equals(divisionId)
+                        && !"ADMIN".equals(doc.getRole())
+                )
                 .toList();
 
         int totalDoctors = doctors.size();
 
-        // Present today
+        // ✅ Present Today
         LocalDate today = LocalDate.now();
 
         long presentDoctors = doctors.stream()

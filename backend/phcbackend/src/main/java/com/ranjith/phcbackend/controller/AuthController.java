@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.ranjith.phcbackend.model.Doctor;
 import com.ranjith.phcbackend.service.AuthService;
 
 @RestController
@@ -30,18 +29,19 @@ public class AuthController {
         String email = request.get("email");
         String password = request.get("password");
 
-        Doctor doctor = authService.login(email, password);
+        Map<String, Object> loginResponse = authService.login(email, password);
 
-        if (doctor == null) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Invalid email or password");
-            return ResponseEntity.status(401).body(response);
+        if (loginResponse == null) {
+            Map<String, String> error = new HashMap<>();
+            error.put("message", "Invalid email or password");
+            return ResponseEntity.status(401).body(error);
         }
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Login successful");
-        response.put("doctorId", doctor.getId());
-        response.put("name", doctor.getName());
+        response.put("doctorId", loginResponse.get("doctorId"));
+        response.put("name", loginResponse.get("name"));
+        response.put("role", loginResponse.get("role"));   // ✅ VERY IMPORTANT
 
         return ResponseEntity.ok(response);
     }

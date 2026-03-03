@@ -1,16 +1,16 @@
 package com.ranjith.phcbackend.service;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
-
-import org.springframework.stereotype.Service;
-
 import com.ranjith.phcbackend.model.Attendance;
 import com.ranjith.phcbackend.model.Doctor;
 import com.ranjith.phcbackend.repository.AttendanceRepository;
 import com.ranjith.phcbackend.repository.DoctorRepository;
+
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class AttendanceService {
@@ -24,9 +24,7 @@ public class AttendanceService {
         this.doctorRepository = doctorRepository;
     }
 
-    // =========================
     // ✅ CHECK-IN
-    // =========================
     public String checkIn(Long doctorId) {
 
         if (doctorId == null) {
@@ -42,10 +40,10 @@ public class AttendanceService {
         Doctor doctor = doctorOptional.get();
         LocalDate today = LocalDate.now();
 
-        Optional<Attendance> existingAttendance =
+        Optional<Attendance> existing =
                 attendanceRepository.findByDoctorAndDate(doctor, today);
 
-        if (existingAttendance.isPresent()) {
+        if (existing.isPresent()) {
             return "Already checked in today";
         }
 
@@ -60,9 +58,7 @@ public class AttendanceService {
         return "Check-in successful";
     }
 
-    // =========================
     // ✅ CHECK-OUT
-    // =========================
     public String checkOut(Long doctorId) {
 
         if (doctorId == null) {
@@ -82,15 +78,10 @@ public class AttendanceService {
                 attendanceRepository.findByDoctorAndDate(doctor, today);
 
         if (attendanceOptional.isEmpty()) {
-            return "Doctor has not checked in today";
+            return "No check-in found for today";
         }
 
         Attendance attendance = attendanceOptional.get();
-
-        if (attendance.getCheckOutTime() != null) {
-            return "Already checked out today";
-        }
-
         attendance.setCheckOutTime(LocalTime.now());
         attendance.setStatus("COMPLETED");
 
@@ -99,43 +90,49 @@ public class AttendanceService {
         return "Check-out successful";
     }
 
-    // =========================
     // ✅ TODAY STATUS
-    // =========================
     public String getTodayStatus(Long doctorId) {
 
         if (doctorId == null) {
-            return "Invalid doctor ID";
+            return "NOT_CHECKED";
         }
 
         Optional<Doctor> doctorOptional = doctorRepository.findById(doctorId);
 
         if (doctorOptional.isEmpty()) {
-            return "Doctor not found";
+            return "NOT_CHECKED";
         }
 
         Doctor doctor = doctorOptional.get();
         LocalDate today = LocalDate.now();
 
-        Optional<Attendance> attendanceOptional =
+        Optional<Attendance> attendance =
                 attendanceRepository.findByDoctorAndDate(doctor, today);
 
-        if (attendanceOptional.isEmpty()) {
-            return "Not checked in";
+        if (attendance.isPresent()) {
+            return attendance.get().getStatus();
         }
 
-        Attendance attendance = attendanceOptional.get();
-
-        if (attendance.getCheckOutTime() == null) {
-            return "Checked in";
-        }
-
-        return "Checked out";
+        return "NOT_CHECKED";
     }
 
-    // =========================
-    // ✅ ATTENDANCE HISTORY
-    // =========================
+    // ✅ FULL HISTORY
+    public List<Attendance> getFullHistory(Long doctorId) {
+
+        if (doctorId == null) {
+            return List.of();
+        }
+
+        Optional<Doctor> doctorOptional = doctorRepository.findById(doctorId);
+
+        if (doctorOptional.isEmpty()) {
+            return List.of();
+        }
+
+        return attendanceRepository.findByDoctor(doctorOptional.get());
+    }
+
+    // ✅ FILTERED HISTORY
     public List<Attendance> getAttendanceHistory(Long doctorId,
                                                  LocalDate startDate,
                                                  LocalDate endDate) {
@@ -150,9 +147,11 @@ public class AttendanceService {
             return List.of();
         }
 
-        Doctor doctor = doctorOptional.get();
-
         return attendanceRepository
-                .findByDoctorAndDateBetween(doctor, startDate, endDate);
+                .findByDoctorAndDateBetween(
+                        doctorOptional.get(),
+                        startDate,
+                        endDate
+                );
     }
 }
