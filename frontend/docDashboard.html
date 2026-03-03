@@ -86,6 +86,9 @@
 </div>
 
 <script>
+  if (localStorage.getItem("role") !== "DOCTOR") {
+    window.location.href = "index.html";
+}
 
 // ===== Show today's date =====
 const today = new Date();

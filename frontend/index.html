@@ -71,15 +71,21 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
             return;
         }
 
-        // 🔥 Correct Keys (CASE SENSITIVE)
+        // ✅ Store data
         localStorage.setItem("doctorId", data.doctorId);
         localStorage.setItem("doctorName", data.name);
+        localStorage.setItem("role", data.role);
 
         document.getElementById("message").innerText = "Login successful";
         document.getElementById("message").className = "text-success text-center mt-3";
 
+        // ✅ Redirect based on role
         setTimeout(() => {
-            window.location.href = "docDashboard.html";
+            if (data.role === "ADMIN") {
+                window.location.href = "ddhcDashboard.html";
+            } else {
+                window.location.href = "docDashboard.html";
+            }
         }, 800);
 
     } catch (error) {
