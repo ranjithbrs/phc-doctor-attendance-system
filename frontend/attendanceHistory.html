@@ -74,6 +74,7 @@
   </div>
 </div>
 
+<script src="config.js"></script>
 <script>
 
 // ===== Session Check =====
@@ -93,7 +94,7 @@ document.addEventListener("DOMContentLoaded", function () {
 // ===== Load History Function =====
 function loadHistory(fromDate = "", toDate = "") {
 
-  let url = `http://localhost:8080/attendance/history/${doctorId}`;
+  let url = `${API_BASE_URL}/attendance/history/${doctorId}`;
 
   if (fromDate && toDate) {
     url += `?from=${fromDate}&to=${toDate}`;

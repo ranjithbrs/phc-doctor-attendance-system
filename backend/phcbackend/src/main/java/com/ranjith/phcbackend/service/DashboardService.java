@@ -1,6 +1,7 @@
 package com.ranjith.phcbackend.service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,37 +29,36 @@ public class DashboardService {
         this.attendanceRepository = attendanceRepository;
     }
 
+    // ✅ SUMMARY (CARDS)
     public Map<String, Object> getSummary(Long divisionId) {
 
         Map<String, Object> summary = new HashMap<>();
 
-        // ✅ Total PHCs in division
         List<PHC> phcs = phcRepository.findAll()
                 .stream()
-                .filter(phc -> phc.getDivision().getId().equals(divisionId))
+                .filter(phc -> phc.getDivision() != null &&
+                        phc.getDivision().getId().equals(divisionId))
                 .toList();
 
         int totalPhc = phcs.size();
 
-        // ✅ Total Doctors (EXCLUDE ADMIN)
         List<Doctor> doctors = doctorRepository.findAll()
                 .stream()
                 .filter(doc ->
-                        doc.getPhc().getDivision().getId().equals(divisionId)
-                        && !"ADMIN".equals(doc.getRole())
+                        doc.getPhc() != null &&
+                        doc.getPhc().getDivision() != null &&
+                        doc.getPhc().getDivision().getId().equals(divisionId) &&
+                        !"ADMIN".equals(doc.getRole())
                 )
                 .toList();
 
         int totalDoctors = doctors.size();
 
-        // ✅ Present Today
         LocalDate today = LocalDate.now();
 
         long presentDoctors = doctors.stream()
                 .filter(doc ->
-                        attendanceRepository
-                                .findByDoctorAndDate(doc, today)
-                                .isPresent()
+                        attendanceRepository.findByDoctorAndDate(doc, today).isPresent()
                 )
                 .count();
 
@@ -70,5 +70,56 @@ public class DashboardService {
         summary.put("absentDoctors", absentDoctors);
 
         return summary;
+    }
+
+    // ✅ TABLE DATA (PHC OVERVIEW)
+    public List<Map<String, Object>> getPhcOverview(Long divisionId) {
+
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        LocalDate today = LocalDate.now();
+
+        List<PHC> phcs = phcRepository.findAll()
+                .stream()
+                .filter(phc -> phc.getDivision() != null &&
+                        phc.getDivision().getId().equals(divisionId))
+                .toList();
+
+        for (PHC phc : phcs) {
+
+            List<Doctor> doctors = doctorRepository.findAll()
+                    .stream()
+                    .filter(doc ->
+                            doc.getPhc() != null &&
+                            doc.getPhc().getId().equals(phc.getId()) &&
+                            !"ADMIN".equals(doc.getRole())
+                    )
+                    .toList();
+
+            int totalDoctors = doctors.size();
+
+            long present = doctors.stream()
+                    .filter(doc -> {
+                        var att = attendanceRepository.findByDoctorAndDate(doc, today);
+                        return att != null && att.isPresent();
+                    })
+                    .count();
+
+            long absent = totalDoctors - present;
+
+            double percentage = totalDoctors == 0 ? 0 :
+                    (present * 100.0) / totalDoctors;
+
+            Map<String, Object> map = new HashMap<>();
+            map.put("phcName", phc.getName());
+            map.put("totalDoctors", totalDoctors);
+            map.put("present", present);
+            map.put("absent", absent);
+            map.put("percentage", String.format("%.2f", percentage));
+
+            result.add(map);
+        }
+
+        return result;
     }
 }

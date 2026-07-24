@@ -26,81 +26,197 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
 
-    public AttendanceController(AttendanceService attendanceService) {
+    public AttendanceController(
+            AttendanceService attendanceService
+    ) {
+
         this.attendanceService = attendanceService;
+
     }
 
-    // ✅ CHECK-IN
+    // ===== CHECK-IN =====
+
     @PostMapping("/checkin")
-    public ResponseEntity<?> checkIn(@RequestBody Map<String, Long> request) {
 
-        Long doctorId = request.get("doctorId");
+    public ResponseEntity<?> checkIn(
+            @RequestBody Map<String, Object> request
+    ) {
+
+        Long doctorId =
+                Long.valueOf(
+                        request.get("doctorId").toString()
+                );
 
         if (doctorId == null) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Doctor ID is required"));
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    "Doctor ID is required"
+                            )
+                    );
+
         }
 
-        String result = attendanceService.checkIn(doctorId);
+        Double latitude = request.get("latitude") != null ? Double.valueOf(request.get("latitude").toString()) : null;
+        Double longitude = request.get("longitude") != null ? Double.valueOf(request.get("longitude").toString()) : null;
 
-        return ResponseEntity.ok(Map.of("message", result));
+        String result =
+                attendanceService.checkIn(doctorId, latitude, longitude);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "message",
+                        result
+                )
+        );
+
     }
 
-    // ✅ CHECK-OUT
+    // ===== CHECK-OUT =====
+
     @PutMapping("/checkout")
-    public ResponseEntity<?> checkOut(@RequestBody Map<String, Long> request) {
 
-        Long doctorId = request.get("doctorId");
+    public ResponseEntity<?> checkOut(
+            @RequestBody Map<String, Object> request
+    ) {
+
+        Long doctorId =
+                Long.valueOf(
+                        request.get("doctorId").toString()
+                );
 
         if (doctorId == null) {
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", "Doctor ID is required"));
+
+            return ResponseEntity
+                    .badRequest()
+                    .body(
+                            Map.of(
+                                    "message",
+                                    "Doctor ID is required"
+                            )
+                    );
+
         }
 
-        String result = attendanceService.checkOut(doctorId);
+        String result =
+                attendanceService.checkOut(doctorId);
 
-        return ResponseEntity.ok(Map.of("message", result));
+        return ResponseEntity.ok(
+                Map.of(
+                        "message",
+                        result
+                )
+        );
+
     }
 
-    // ✅ TODAY STATUS
+    // ===== MARK ABSENT =====
+
+    @PostMapping("/absent")
+
+    public ResponseEntity<?> markAbsent(
+            @RequestBody Map<String, Object> request
+    ) {
+
+        Long doctorId =
+                Long.valueOf(
+                        request.get("doctorId").toString()
+                );
+
+        attendanceService.markAbsent(doctorId);
+
+        return ResponseEntity.ok(
+
+                Map.of(
+                        "message",
+                        "Doctor marked absent successfully"
+                )
+
+        );
+
+    }
+
+    // ===== TODAY STATUS =====
+
     @GetMapping("/status/{doctorId}")
-    public ResponseEntity<?> getTodayStatus(@PathVariable Long doctorId) {
 
-        String status = attendanceService.getTodayStatus(doctorId);
+    public ResponseEntity<?> getTodayStatus(
+            @PathVariable Long doctorId
+    ) {
 
-        Map<String, String> response = new HashMap<>();
+        String status =
+                attendanceService.getTodayStatus(
+                        doctorId
+                );
+
+        Map<String, String> response =
+                new HashMap<>();
+
         response.put("status", status);
 
         return ResponseEntity.ok(response);
+
     }
 
-    // ✅ HISTORY (FULL + FILTER)
-    @GetMapping("/history/{doctorId}")
-    public ResponseEntity<?> getHistory(
-            @PathVariable Long doctorId,
-            @RequestParam(required = false) String from,
-            @RequestParam(required = false) String to) {
+    // ===== HISTORY =====
 
-        // If filter applied
+    @GetMapping("/history/{doctorId}")
+
+    public ResponseEntity<?> getHistory(
+
+            @PathVariable Long doctorId,
+
+            @RequestParam(required = false)
+            String from,
+
+            @RequestParam(required = false)
+            String to
+
+    ) {
+
+        // ===== FILTERED HISTORY =====
+
         if (from != null && to != null) {
 
-            LocalDate startDate = LocalDate.parse(from);
-            LocalDate endDate = LocalDate.parse(to);
+            LocalDate startDate =
+                    LocalDate.parse(from);
+
+            LocalDate endDate =
+                    LocalDate.parse(to);
 
             List<Attendance> filteredHistory =
-                    attendanceService.getAttendanceHistory(
-                            doctorId,
-                            startDate,
-                            endDate
-                    );
 
-            return ResponseEntity.ok(filteredHistory);
+                    attendanceService
+                            .getAttendanceHistory(
+
+                                    doctorId,
+                                    startDate,
+                                    endDate
+
+                            );
+
+            return ResponseEntity.ok(
+                    filteredHistory
+            );
+
         }
 
-        // Return full history if no filter
-        List<Attendance> fullHistory =
-                attendanceService.getFullHistory(doctorId);
+        // ===== FULL HISTORY =====
 
-        return ResponseEntity.ok(fullHistory);
+        List<Attendance> fullHistory =
+
+                attendanceService
+                        .getFullHistory(
+                                doctorId
+                        );
+
+        return ResponseEntity.ok(
+                fullHistory
+        );
+
     }
+
 }

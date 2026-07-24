@@ -1,16 +1,19 @@
 package com.ranjith.phcbackend.controller;
 
-import org.springframework.http.ResponseEntity;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ranjith.phcbackend.service.DashboardService;
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/dashboard")
-@CrossOrigin(origins = "*")
 public class DashboardController {
 
     private final DashboardService dashboardService;
@@ -19,10 +22,15 @@ public class DashboardController {
         this.dashboardService = dashboardService;
     }
 
-    @GetMapping("/summary")
-    public ResponseEntity<?> getSummary() {
+    // ✅ SUMMARY
+    @GetMapping("/summary/{divisionId}")
+    public Map<String, Object> getSummary(@PathVariable Long divisionId) {
+        return dashboardService.getSummary(divisionId);
+    }
 
-        // 🔥 Hardcoded divisionId = 1
-        return ResponseEntity.ok(dashboardService.getSummary(1L));
+    // ✅ TABLE
+    @GetMapping("/phc-overview/{divisionId}")
+    public List<Map<String, Object>> getPhcOverview(@PathVariable Long divisionId) {
+        return dashboardService.getPhcOverview(divisionId);
     }
 }

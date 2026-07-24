@@ -22,6 +22,10 @@ public class PHC {
 
     private String type; // PHC / Upgraded PHC / SubCentre
 
+    private Double latitude;
+
+    private Double longitude;
+
     @ManyToOne
     @JoinColumn(name = "division_id", nullable = false)
     private Division division;
@@ -31,10 +35,12 @@ public class PHC {
     }
 
     // Parameterized Constructor
-    public PHC(String name, String location, String type, Division division) {
+    public PHC(String name, String location, String type, Double latitude, Double longitude, Division division) {
         this.name = name;
         this.location = location;
         this.type = type;
+        this.latitude = latitude;
+        this.longitude = longitude;
         this.division = division;
     }
 
@@ -56,6 +62,14 @@ public class PHC {
         return type;
     }
 
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
     public Division getDivision() {
         return division;
     }
@@ -70,6 +84,14 @@ public class PHC {
 
     public void setType(String type) {
         this.type = type;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 
     public void setDivision(Division division) {
