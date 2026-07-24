@@ -5,8 +5,8 @@ COPY pom.xml .
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-# Stage 2: Run the JAR using OpenJDK 17
-FROM openjdk:17-jdk-slim
+# Stage 2: Run the JAR using Eclipse Temurin 17 (replaces deprecated openjdk)
+FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
