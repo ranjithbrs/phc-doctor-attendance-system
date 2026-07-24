@@ -5,7 +5,7 @@
  * You can also manually override the API URL by executing in browser console:
  * localStorage.setItem("API_BASE_URL", "https://your-backend-domain.com");
  */
-const DEFAULT_PROD_API_URL = "REPLACE_WITH_BACKEND_URL"; // Set this to your live backend URL after deployment
+const DEFAULT_PROD_API_URL = "https://phc-doctor-attendance-system.onrender.com"; // Live Render backend
 
 const isLocalEnvironment = 
     window.location.hostname === "localhost" ||
