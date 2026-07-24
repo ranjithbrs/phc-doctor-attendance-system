@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PHC Doctor Attendance System - Register</title>
+  <meta name="description" content="Register as a Doctor or Admin for PHC Doctor Attendance System.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="login-wrapper">
+  <div class="login-card" style="max-width: 480px; padding: 40px 36px;">
+    <div class="login-logo">🏥</div>
+    <h1 class="login-title">Create Account</h1>
+    <p class="login-subtitle">Primary Health Centre · Registration</p>
+
+    <form id="registerForm">
+      <div class="form-group">
+        <label class="form-label" for="name">Full Name</label>
+        <input type="text" class="form-control" id="name" placeholder="Dr. Jane Doe" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">Email Address</label>
+        <input type="email" class="form-control" id="email" placeholder="doctor@phc.gov.in" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" class="form-control" id="password" placeholder="••••••••" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="specialization">Specialization</label>
+        <input type="text" class="form-control" id="specialization" placeholder="General Physician" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="phcId">Assigned PHC</label>
+        <select class="form-control" id="phcId" required>
+          <option value="">Loading PHCs...</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="role">Account Role</label>
+        <select class="form-control" id="role" required>
+          <option value="DOCTOR">Doctor</option>
+          <option value="ADMIN">Admin / DDHS</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg mt-2" id="registerBtn">
+        Register Account
+      </button>
+
+      <p class="text-center mt-3 text-muted" style="font-size:14px;">
+        Already have an account? <a href="index.html" style="color:var(--primary); font-weight:600; text-decoration:none;">Sign In</a>
+      </p>
+    </form>
+
+    <div class="alert alert-danger" id="errorMsg"></div>
+    <div class="alert alert-success" id="successMsg"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", async function() {
+  const phcSelect = document.getElementById("phcId");
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/phcs`);
+    const phcs = await res.json();
+    if (phcs && phcs.length > 0) {
+      phcSelect.innerHTML = phcs.map(phc => `<option value="${phc.id}">${phc.name} (${phc.location})</option>`).join("");
+    } else {
+      phcSelect.innerHTML = `<option value="1">Thudiyalur PHC (Default)</option>`;
+    }
+  } catch (err) {
+    console.error(err);
+    phcSelect.innerHTML = `<option value="1">Thudiyalur PHC (Default)</option>`;
+  }
+});
+
+document.getElementById("registerForm").addEventListener("submit", async function(e) {
+  e.preventDefault();
+
+  const name           = document.getElementById("name").value;
+  const email          = document.getElementById("email").value;
+  const password       = document.getElementById("password").value;
+  const specialization = document.getElementById("specialization").value;
+  const phcId          = document.getElementById("phcId").value;
+  const role           = document.getElementById("role").value;
+
+  const btn        = document.getElementById("registerBtn");
+  const errorMsg   = document.getElementById("errorMsg");
+  const successMsg = document.getElementById("successMsg");
+
+  errorMsg.classList.remove("show");
+  successMsg.classList.remove("show");
+
+  btn.innerHTML = '<span class="spinner"></span> Registering...';
+  btn.disabled = true;
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, specialization, role, phcId })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      errorMsg.textContent = data.error || data.message || "Registration failed";
+      errorMsg.classList.add("show");
+      btn.innerHTML = "Register Account";
+      btn.disabled = false;
+      return;
+    }
+
+    localStorage.setItem("doctorId",   data.doctorId);
+    localStorage.setItem("doctorName", data.name);
+    localStorage.setItem("role",       data.role);
+
+    successMsg.textContent = "Registration successful! Redirecting...";
+    successMsg.classList.add("show");
+
+    setTimeout(() => {
+      window.location.href = data.role === "ADMIN" ? "ddhcDashboard.html" : "docDashboard.html";
+    }, 1000);
+
+  } catch (error) {
+    console.error(error);
+    errorMsg.textContent = "Server error. Please try again.";
+    errorMsg.classList.add("show");
+    btn.innerHTML = "Register Account";
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

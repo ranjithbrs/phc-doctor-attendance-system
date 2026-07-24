@@ -41,8 +41,31 @@ public class AuthController {
         response.put("message", "Login successful");
         response.put("doctorId", loginResponse.get("doctorId"));
         response.put("name", loginResponse.get("name"));
-        response.put("role", loginResponse.get("role"));   // ✅ VERY IMPORTANT
+        response.put("role", loginResponse.get("role"));
 
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<?> register(@RequestBody Map<String, Object> request) {
+        String name = (String) request.get("name");
+        String email = (String) request.get("email");
+        String password = (String) request.get("password");
+        String specialization = (String) request.get("specialization");
+        String role = (String) request.getOrDefault("role", "DOCTOR");
+        Long phcId = Long.valueOf(request.get("phcId").toString());
+
+        Map<String, Object> registerResponse = authService.register(name, email, password, specialization, role, phcId);
+
+        if (registerResponse.containsKey("error")) {
+            return ResponseEntity.badRequest().body(registerResponse);
+        }
+
+        return ResponseEntity.ok(registerResponse);
+    }
+
+    @org.springframework.web.bind.annotation.GetMapping("/phcs")
+    public ResponseEntity<?> getPhcs() {
+        return ResponseEntity.ok(authService.getAllPhcs());
     }
 }
