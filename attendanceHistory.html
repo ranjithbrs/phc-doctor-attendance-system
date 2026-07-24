@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance History</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      background: #f1f5f9;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .history-card {
+      max-width: 1100px;
+      margin: 40px auto;
+      background: white;
+      border-radius: 18px;
+      padding: 25px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+    }
+
+    table th {
+      background: #e2e8f0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="history-card">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h3>📊 Attendance History</h3>
+      <button class="btn btn-secondary" onclick="goBack()">⬅ Back</button>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label>From Date</label>
+        <input type="date" class="form-control" id="fromDate">
+      </div>
+
+      <div class="col-md-4">
+        <label>To Date</label>
+        <input type="date" class="form-control" id="toDate">
+      </div>
+
+      <div class="col-md-4 d-grid align-items-end">
+        <button class="btn btn-primary" onclick="filterHistory()">🔍 Filter</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover text-center">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Check In</th>
+            <th>Check Out</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="historyTable">
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+
+// ===== Session Check =====
+const doctorId = localStorage.getItem("doctorId");
+
+if (!doctorId || doctorId === "undefined" || doctorId === "null") {
+  alert("Session expired. Please login again.");
+  localStorage.clear();
+  window.location.href = "index.html";
+}
+
+// ===== Load Full History =====
+document.addEventListener("DOMContentLoaded", function () {
+  loadHistory();
+});
+
+// ===== Load History Function =====
+function loadHistory(fromDate = "", toDate = "") {
+
+  let url = `${API_BASE_URL}/attendance/history/${doctorId}`;
+
+  if (fromDate && toDate) {
+    url += `?from=${fromDate}&to=${toDate}`;
+  }
+
+  fetch(url)
+    .then(res => res.json())
+    .then(data => {
+      renderTable(data);
+    })
+    .catch(error => {
+      console.error("History load error:", error);
+      alert("Failed to load history");
+    });
+}
+
+// ===== Render Table =====
+function renderTable(records) {
+
+  const tableBody = document.getElementById("historyTable");
+  tableBody.innerHTML = "";
+
+  if (!records || records.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="4">No records found</td>
+      </tr>
+    `;
+    return;
+  }
+
+  records.forEach(record => {
+
+    let statusClass = "text-danger";
+
+    if (record.status === "PRESENT") statusClass = "text-success";
+    if (record.status === "COMPLETED") statusClass = "text-primary";
+
+    tableBody.innerHTML += `
+      <tr>
+        <td>${record.date}</td>
+        <td>${record.checkInTime ? record.checkInTime : "-"}</td>
+        <td>${record.checkOutTime ? record.checkOutTime : "-"}</td>
+        <td class="${statusClass}">${record.status}</td>
+      </tr>
+    `;
+  });
+}
+
+// ===== Filter =====
+function filterHistory() {
+
+  const fromDate = document.getElementById("fromDate").value;
+  const toDate = document.getElementById("toDate").value;
+
+  if (!fromDate || !toDate) {
+    alert("Please select both dates");
+    return;
+  }
+
+  if (new Date(fromDate) > new Date(toDate)) {
+    alert("From date cannot be greater than To date");
+    return;
+  }
+
+  loadHistory(fromDate, toDate);
+}
+
+// ===== Back Button =====
+function goBack() {
+  window.location.href = "docDashboard.html";
+}
+
+</script>
+
+</body>
+</html>
