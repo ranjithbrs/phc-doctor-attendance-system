@@ -1,568 +1,209 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Doctor Dashboard</title>
-
-  <!-- Bootstrap -->
-
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  >
-
-  <!-- Leaflet CSS & JS for Geo-Fence Map -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <title>Doctor Dashboard - PHC Attendance</title>
+  <meta name="description" content="Doctor dashboard for geo-fenced check-in and attendance tracking at PHC.">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <style>
-
-    body {
-
-      background: linear-gradient(135deg, #eef2ff, #f8fafc);
-
-      min-height: 100vh;
-
-      font-family:
-        'Segoe UI',
-        Tahoma,
-        Geneva,
-        Verdana,
-        sans-serif;
-
-    }
-
-    .dashboard-card {
-
-      max-width: 950px;
-
-      margin: 40px auto;
-
-      border-radius: 18px;
-
-      background: white;
-
-      box-shadow: 0 10px 25px rgba(0,0,0,0.08);
-
-      padding: 30px;
-
-    }
-
-    .status-box {
-
-      border-radius: 14px;
-
-      background: #f1f5f9;
-
-      padding: 25px;
-
-      text-align: center;
-
-      margin-bottom: 25px;
-
-    }
-
-    .big-btn {
-
-      padding: 14px;
-
-      font-size: 18px;
-
-      border-radius: 12px;
-
-      font-weight: 600;
-
-    }
-
-    .header-title {
-
-      font-weight: 700;
-
-    }
-
-    .date-text {
-
-      color: #64748b;
-
-      font-size: 15px;
-
-    }
-
-  </style>
-
 </head>
-
 <body>
 
-<div class="container">
+<div class="page-bg">
+<div class="dashboard-wrapper" style="max-width:900px;">
 
-  <div class="dashboard-card">
-
-    <!-- HEADER -->
-
-    <div
-      class="d-flex justify-content-between align-items-center mb-3"
-    >
-
-      <h2 class="header-title m-0">
-
-        👨‍⚕️ Doctor Dashboard -
-        <span id="doctorName"></span>
-
-      </h2>
-
-      <button
-        class="btn btn-secondary"
-        onclick="logout()"
-      >
-
-        Logout
-
-      </button>
-
-    </div>
-
-    <!-- DATE -->
-
-    <p
-      class="date-text text-center mb-4"
-      id="todayDate"
-    ></p>
-
-    <!-- STATUS -->
-
-    <div class="status-box">
-
-      <h4>Today's Attendance Status</h4>
-
-      <h2
-        id="statusText"
-        class="text-danger"
-      >
-
-        Loading...
-
-      </h2>
-
-    </div>
-
-    <!-- INTERACTIVE MAP PREVIEW -->
-    <div class="mb-4">
-      <h5 class="text-secondary mb-2">📍 Live GPS & 500m Geo-Fence Map</h5>
-      <div id="map" style="height: 280px; border-radius: 14px; z-index: 1;" class="shadow-sm border"></div>
-    </div>
-
-    <!-- BUTTONS -->
-
-    <div class="row g-3">
-
-      <!-- CHECK IN -->
-
-      <div class="col-md-4 d-grid">
-
-        <button
-          class="btn btn-success big-btn"
-          id="checkInBtn"
-        >
-
-          ✅ Check In
-
-        </button>
-
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-icon">👨‍⚕️</div>
+      <div>
+        <div class="topbar-title">Dr. <span id="doctorName"></span></div>
+        <div class="topbar-subtitle" id="todayDate"></div>
       </div>
-
-      <!-- CHECK OUT -->
-
-      <div class="col-md-4 d-grid">
-
-        <button
-          class="btn btn-danger big-btn"
-          id="checkOutBtn"
-        >
-
-          🔴 Check Out
-
-        </button>
-
-      </div>
-
-      <!-- HISTORY -->
-
-      <div class="col-md-4 d-grid">
-
-        <button
-          class="btn btn-secondary big-btn"
-          onclick="goToHistory()"
-        >
-
-          📊 View History
-
-        </button>
-
-      </div>
-
     </div>
-
+    <button class="btn btn-secondary" onclick="logout()">⬅ Logout</button>
   </div>
+
+  <!-- Attendance Status Banner -->
+  <div class="status-banner">
+    <div class="status-label">Today's Attendance Status</div>
+    <div class="status-value absent" id="statusText">Loading...</div>
+  </div>
+
+  <!-- Live Map -->
+  <div class="map-wrapper">
+    <div class="map-header">📍 Live GPS &amp; 500m Geo-Fence Map</div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="action-grid">
+    <button class="btn btn-success btn-lg" id="checkInBtn">✅ Check In</button>
+    <button class="btn btn-danger btn-lg"  id="checkOutBtn">🔴 Check Out</button>
+    <button class="btn btn-secondary btn-lg" onclick="goToHistory()">📊 View History</button>
+  </div>
+
+  <!-- Alert message -->
+  <div class="alert" id="alertMsg"></div>
+
+</div>
+</div>
 
 <script src="config.js"></script>
 <script>
 
-  // ===== ROLE VALIDATION =====
+// Session & role check
+if (localStorage.getItem("role") !== "DOCTOR") {
+  window.location.href = "index.html";
+}
 
-  if (
-      localStorage.getItem("role")
-      !== "DOCTOR"
-     ) {
+const doctorId   = localStorage.getItem("doctorId");
+const doctorName = localStorage.getItem("doctorName") || "Doctor";
 
-    window.location.href = "index.html";
+if (!doctorId || doctorId === "undefined" || doctorId === "null") {
+  alert("Session expired. Please login again.");
+  localStorage.clear();
+  window.location.href = "index.html";
+}
 
+document.getElementById("doctorName").innerText = doctorName;
+document.getElementById("todayDate").innerText  = new Date().toDateString();
+
+// ===== MAP =====
+let map, userMarker, fenceCircle;
+
+function initMap(lat, lng) {
+  if (!map) {
+    map = L.map('map').setView([lat, lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    userMarker = L.marker([lat, lng]).addTo(map)
+      .bindPopup("📍 Your Live Position").openPopup();
+
+    fenceCircle = L.circle([lat, lng], {
+      color: '#2563eb', fillColor: '#60a5fa',
+      fillOpacity: 0.15, radius: 500
+    }).addTo(map);
+  } else {
+    map.setView([lat, lng], 15);
+    userMarker.setLatLng([lat, lng]);
+    fenceCircle.setLatLng([lat, lng]);
   }
+}
 
-  // ===== TODAY DATE =====
-
-  const today = new Date();
-
-  document.getElementById(
-    "todayDate"
-  ).innerText = today.toDateString();
-
-  // ===== DOCTOR NAME =====
-
-  const doctorName =
-    localStorage.getItem("doctorName");
-
-  document.getElementById(
-    "doctorName"
-  ).innerText = doctorName;
-
-  // ===== DOCTOR ID =====
-
-  const doctorId =
-    localStorage.getItem("doctorId");
-
-  if (
-      !doctorId
-      ||
-      doctorId === "undefined"
-      ||
-      doctorId === "null"
-     ) {
-
-    alert(
-      "Session expired. Please login again."
-    );
-
-    localStorage.clear();
-
-    window.location.href = "index.html";
-
-  }
-
-  // ===== LEAFLET MAP SETUP =====
-  let map, userMarker, fenceCircle;
-
-  function initMap(lat, lng) {
-      if (!map) {
-          map = L.map('map').setView([lat, lng], 14);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-              maxZoom: 19,
-              attribution: '© OpenStreetMap'
-          }).addTo(map);
-
-          userMarker = L.marker([lat, lng]).addTo(map)
-              .bindPopup("📍 Your Live Position")
-              .openPopup();
-
-          fenceCircle = L.circle([lat, lng], {
-              color: '#2563eb',
-              fillColor: '#60a5fa',
-              fillOpacity: 0.2,
-              radius: 500
-          }).addTo(map);
-      } else {
-          map.setView([lat, lng], 14);
-          userMarker.setLatLng([lat, lng]);
-          fenceCircle.setLatLng([lat, lng]);
-      }
-  }
-
-  if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-          (pos) => initMap(pos.coords.latitude, pos.coords.longitude),
-          () => console.log("GPS preview pending permission")
-      );
-  }
-
-  // ===== LOAD STATUS =====
-
-  document.addEventListener(
-    "DOMContentLoaded",
-    loadStatus
+if (navigator.geolocation) {
+  navigator.geolocation.getCurrentPosition(
+    pos => initMap(pos.coords.latitude, pos.coords.longitude),
+    ()  => console.log("GPS pending permission")
   );
+}
 
-  function loadStatus() {
+// ===== ALERT HELPER =====
+function showAlert(msg, type) {
+  const el = document.getElementById("alertMsg");
+  el.textContent = msg;
+  el.className = `alert alert-${type} show`;
+  setTimeout(() => el.classList.remove("show"), 4000);
+}
 
-    fetch(
-      `${API_BASE_URL}/attendance/status/${doctorId}`
-    )
-
+// ===== LOAD STATUS =====
+function loadStatus() {
+  fetch(`${API_BASE_URL}/attendance/status/${doctorId}`)
     .then(res => res.json())
+    .then(data => updateStatusUI(data && data.status ? data.status : "NOT_CHECKED"))
+    .catch(() => updateStatusUI("NOT_CHECKED"));
+}
 
-    .then(data => {
+function updateStatusUI(status) {
+  const el = document.getElementById("statusText");
+  const map = {
+    PRESENT:     { text: "✅ Checked In",  cls: "present" },
+    CHECKED_IN:  { text: "✅ Checked In",  cls: "present" },
+    COMPLETED:   { text: "🔵 Checked Out", cls: "present" },
+    CHECKED_OUT: { text: "🔵 Checked Out", cls: "present" },
+    ABSENT:      { text: "❌ Absent",       cls: "absent"  },
+  };
+  const s = map[status] || { text: "❌ Not Checked In", cls: "absent" };
+  el.textContent  = s.text;
+  el.className    = `status-value ${s.cls}`;
+}
 
-      if (
-          data
-          &&
-          data.status
-         ) {
+document.addEventListener("DOMContentLoaded", loadStatus);
 
-        updateStatusUI(
-          data.status
-        );
-
-      }
-
-      else {
-
-        updateStatusUI(
-          "NOT_CHECKED"
-        );
-
-      }
-
-    })
-
-    .catch(error => {
-
-      console.error(
-        "Status error:",
-        error
-      );
-
-      updateStatusUI(
-        "NOT_CHECKED"
-      );
-
-    });
-
+// ===== CHECK IN =====
+document.getElementById("checkInBtn").addEventListener("click", () => {
+  if (!navigator.geolocation) {
+    showAlert("Geolocation not supported by your browser.", "danger");
+    return;
   }
 
-  // ===== CHECK IN =====
+  const btn = document.getElementById("checkInBtn");
+  btn.innerHTML = '<span class="spinner"></span> Getting location...';
+  btn.disabled = true;
 
-  document.getElementById("checkInBtn").addEventListener("click", () => {
-      if (!navigator.geolocation) {
-          alert("Geolocation is not supported by your browser.");
-          return;
-      }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      const { latitude, longitude } = pos.coords;
+      initMap(latitude, longitude);
 
-      navigator.geolocation.getCurrentPosition(
-          (position) => {
-              const latitude = position.coords.latitude;
-              const longitude = position.coords.longitude;
-              initMap(latitude, longitude);
-
-              fetch(`${API_BASE_URL}/attendance/checkin`, {
-                  method: "POST",
-                  headers: {
-                      "Content-Type": "application/json"
-                  },
-                  body: JSON.stringify({
-                      doctorId: Number(doctorId),
-                      latitude: latitude,
-                      longitude: longitude
-                  })
-              })
-              .then(res => res.json())
-              .then(data => {
-                  alert(data.message);
-                  loadStatus();
-              })
-              .catch(error => {
-                  console.error("Check-in error:", error);
-                  alert("Check-in request failed. Please check server connection.");
-              });
-          },
-          (error) => {
-              console.error("GPS location error:", error);
-              alert("Location permission denied or unavailable. Please enable GPS.");
-          }
-      );
-  });
-
-  // ===== CHECK OUT =====
-
-  document.getElementById(
-    "checkOutBtn"
-  )
-
-  .addEventListener(
-    "click",
-    () => {
-
-      fetch(
-
-        `${API_BASE_URL}/attendance/checkout`,
-
-        {
-
-          method: "PUT",
-
-          headers: {
-
-            "Content-Type":
-              "application/json"
-
-          },
-
-          body: JSON.stringify({
-
-            doctorId:
-              Number(doctorId)
-
-          })
-
-        }
-
-      )
-
-      .then(res => res.json())
-
-      .then(data => {
-
-        alert(
-          data.message
-        );
-
-        updateStatusUI(
-          "COMPLETED"
-        );
-
-        loadStatus();
-
+      fetch(`${API_BASE_URL}/attendance/checkin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doctorId: Number(doctorId), latitude, longitude })
       })
-
-      .catch(error => {
-
-        console.error(
-          "Check-out error:",
-          error
-        );
-
-        alert(
-          "Check-out failed."
-        );
-
+      .then(res => res.json())
+      .then(data => {
+        showAlert(data.message, "success");
+        loadStatus();
+        btn.innerHTML = "✅ Check In";
+        btn.disabled  = false;
+      })
+      .catch(() => {
+        showAlert("Check-in failed. Please try again.", "danger");
+        btn.innerHTML = "✅ Check In";
+        btn.disabled  = false;
       });
-
+    },
+    () => {
+      showAlert("GPS permission denied. Please enable location access.", "danger");
+      btn.innerHTML = "✅ Check In";
+      btn.disabled  = false;
     }
-
   );
+});
 
-  // ===== STATUS UI =====
+// ===== CHECK OUT =====
+document.getElementById("checkOutBtn").addEventListener("click", () => {
+  const btn = document.getElementById("checkOutBtn");
+  btn.innerHTML = '<span class="spinner"></span> Checking out...';
+  btn.disabled  = true;
 
-  function updateStatusUI(status) {
+  fetch(`${API_BASE_URL}/attendance/checkout`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ doctorId: Number(doctorId) })
+  })
+  .then(res => res.json())
+  .then(data => {
+    showAlert(data.message, "success");
+    loadStatus();
+    btn.innerHTML = "🔴 Check Out";
+    btn.disabled  = false;
+  })
+  .catch(() => {
+    showAlert("Check-out failed. Please try again.", "danger");
+    btn.innerHTML = "🔴 Check Out";
+    btn.disabled  = false;
+  });
+});
 
-    const statusText =
-      document.getElementById(
-        "statusText"
-      );
-
-    // PRESENT
-
-    if (
-
-      status === "PRESENT"
-
-      ||
-
-      status === "CHECKED_IN"
-
-    ) {
-
-      statusText.innerText =
-        "Checked In";
-
-      statusText.className =
-        "text-success";
-
-    }
-
-    // COMPLETED
-
-    else if (
-
-      status === "COMPLETED"
-
-      ||
-
-      status === "CHECKED_OUT"
-
-    ) {
-
-      statusText.innerText =
-        "Checked Out";
-
-      statusText.className =
-        "text-primary";
-
-    }
-
-    // ABSENT
-
-    else if (
-
-      status === "ABSENT"
-
-    ) {
-
-      statusText.innerText =
-        "Absent";
-
-      statusText.className =
-        "text-danger";
-
-    }
-
-    // DEFAULT
-
-    else {
-
-      statusText.innerText =
-        "Not Checked In";
-
-      statusText.className =
-        "text-danger";
-
-    }
-
-  }
-
-  // ===== LOGOUT =====
-
-  function logout() {
-
-    localStorage.clear();
-
-    window.location.href =
-      "index.html";
-
-  }
-
-  // ===== HISTORY PAGE =====
-
-  function goToHistory() {
-
-    window.location.href =
-      "attendanceHistory.html";
-
-  }
+function logout()      { localStorage.clear(); window.location.href = "index.html"; }
+function goToHistory() { window.location.href = "attendanceHistory.html"; }
 
 </script>
-
 </body>
-
 </html>
