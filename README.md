@@ -1,4 +1,4 @@
-# 🏥 Primary Health Centre (PHC) Doctor Attendance & Monitoring Syste
+# 🏥 Primary Health Centre (PHC) Doctor Attendance & Monitoring System
 
 A modern, full-stack, geo-fenced web application designed for central medical administration and doctor attendance monitoring across Primary Health Centres (PHCs).
 
