@@ -97,7 +97,7 @@ function renderTable(records) {
   const tableBody = document.getElementById("historyTable");
   tableBody.innerHTML = "";
 
-  if (!records || records.length === 0) {
+  if (!records || !Array.isArray(records) || records.length === 0) {
     tableBody.innerHTML = `<tr><td colspan="4" class="text-muted" style="padding:30px;">No records found for selected period</td></tr>`;
     return;
   }

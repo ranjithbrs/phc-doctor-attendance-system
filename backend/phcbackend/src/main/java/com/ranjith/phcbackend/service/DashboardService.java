@@ -57,9 +57,12 @@ public class DashboardService {
         LocalDate today = LocalDate.now();
 
         long presentDoctors = doctors.stream()
-                .filter(doc ->
-                        attendanceRepository.findByDoctorAndDate(doc, today).isPresent()
-                )
+                .filter(doc -> {
+                    var att = attendanceRepository.findByDoctorAndDate(doc, today);
+                    if (att.isEmpty()) return false;
+                    String status = att.get().getStatus();
+                    return "PRESENT".equals(status) || "COMPLETED".equals(status);
+                })
                 .count();
 
         long absentDoctors = totalDoctors - presentDoctors;
@@ -101,7 +104,9 @@ public class DashboardService {
             long present = doctors.stream()
                     .filter(doc -> {
                         var att = attendanceRepository.findByDoctorAndDate(doc, today);
-                        return att != null && att.isPresent();
+                        if (att == null || att.isEmpty()) return false;
+                        String status = att.get().getStatus();
+                        return "PRESENT".equals(status) || "COMPLETED".equals(status);
                     })
                     .count();
 
@@ -115,7 +120,7 @@ public class DashboardService {
             map.put("totalDoctors", totalDoctors);
             map.put("present", present);
             map.put("absent", absent);
-            map.put("percentage", String.format("%.2f", percentage));
+            map.put("percentage", String.format(java.util.Locale.US, "%.2f", percentage));
 
             result.add(map);
         }

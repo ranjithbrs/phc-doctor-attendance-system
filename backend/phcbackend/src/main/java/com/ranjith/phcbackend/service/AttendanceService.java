@@ -149,24 +149,29 @@ public class AttendanceService {
                         );
 
         if (attendanceOptional.isEmpty()) {
-
             return "No check-in found for today";
-
         }
 
-        Attendance attendance =
-                attendanceOptional.get();
+        Attendance attendance = attendanceOptional.get();
 
-        attendance.setCheckOutTime(
-                LocalTime.now()
-        );
+        if ("ABSENT".equals(attendance.getStatus())) {
+            return "Cannot check out: You were marked ABSENT for today due to being outside the PHC geo-fence.";
+        }
 
+        if ("COMPLETED".equals(attendance.getStatus())) {
+            return "Already checked out today";
+        }
+
+        if (!"PRESENT".equals(attendance.getStatus())) {
+            return "No active check-in found for today";
+        }
+
+        attendance.setCheckOutTime(LocalTime.now());
         attendance.setStatus("COMPLETED");
 
         attendanceRepository.save(attendance);
 
         return "Check-out successful";
-
     }
 
     // ===== MARK ABSENT =====

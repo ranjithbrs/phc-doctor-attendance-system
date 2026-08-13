@@ -95,19 +95,28 @@ function initMap(lat, lng) {
   }
 }
 
-if (navigator.geolocation) {
-  navigator.geolocation.getCurrentPosition(
-    pos => initMap(pos.coords.latitude, pos.coords.longitude),
-    ()  => console.log("GPS pending permission")
-  );
-}
+// Initial map center (Default PHC location)
+const DEFAULT_LAT = 11.0168;
+const DEFAULT_LNG = 76.9558;
+
+// Initialize map with default center immediately on load
+document.addEventListener("DOMContentLoaded", () => {
+  initMap(DEFAULT_LAT, DEFAULT_LNG);
+  loadStatus();
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => initMap(pos.coords.latitude, pos.coords.longitude),
+      ()  => console.log("Using default map center until GPS is permitted")
+    );
+  }
+});
 
 // ===== ALERT HELPER =====
-function showAlert(msg, type) {
+function showAlert(msg, type = "success") {
   const el = document.getElementById("alertMsg");
   el.textContent = msg;
   el.className = `alert alert-${type} show`;
-  setTimeout(() => el.classList.remove("show"), 4000);
+  setTimeout(() => el.classList.remove("show"), 4500);
 }
 
 // ===== LOAD STATUS =====
@@ -132,8 +141,6 @@ function updateStatusUI(status) {
   el.className    = `status-value ${s.cls}`;
 }
 
-document.addEventListener("DOMContentLoaded", loadStatus);
-
 // ===== CHECK IN =====
 document.getElementById("checkInBtn").addEventListener("click", () => {
   if (!navigator.geolocation) {
@@ -157,7 +164,9 @@ document.getElementById("checkInBtn").addEventListener("click", () => {
       })
       .then(res => res.json())
       .then(data => {
-        showAlert(data.message, "success");
+        const msg = data.message || "";
+        const isError = msg.includes("ABSENT") || msg.includes("Outside") || msg.includes("failed") || msg.includes("Invalid");
+        showAlert(msg, isError ? "danger" : "success");
         loadStatus();
         btn.innerHTML = "✅ Check In";
         btn.disabled  = false;
@@ -189,7 +198,9 @@ document.getElementById("checkOutBtn").addEventListener("click", () => {
   })
   .then(res => res.json())
   .then(data => {
-    showAlert(data.message, "success");
+    const msg = data.message || "";
+    const isError = msg.includes("Cannot") || msg.includes("failed") || msg.includes("No active") || msg.includes("Invalid") || msg.includes("Already");
+    showAlert(msg, isError ? "danger" : "success");
     loadStatus();
     btn.innerHTML = "🔴 Check Out";
     btn.disabled  = false;
