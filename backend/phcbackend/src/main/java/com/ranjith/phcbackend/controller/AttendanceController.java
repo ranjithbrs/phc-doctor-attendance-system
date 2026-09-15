@@ -37,42 +37,50 @@ public class AttendanceController {
     // ===== CHECK-IN =====
 
     @PostMapping("/checkin")
-
-    public ResponseEntity<?> checkIn(
-            @RequestBody Map<String, Object> request
-    ) {
-
-        Long doctorId =
-                Long.valueOf(
-                        request.get("doctorId").toString()
-                );
-
-        if (doctorId == null) {
-
-            return ResponseEntity
-                    .badRequest()
-                    .body(
-                            Map.of(
-                                    "message",
-                                    "Doctor ID is required"
-                            )
-                    );
-
+    public ResponseEntity<?> checkIn(@RequestBody Map<String, Object> request) {
+        if (request == null || request.get("doctorId") == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Doctor ID is required"));
         }
 
-        Double latitude = request.get("latitude") != null ? Double.valueOf(request.get("latitude").toString()) : null;
-        Double longitude = request.get("longitude") != null ? Double.valueOf(request.get("longitude").toString()) : null;
+        Long doctorId;
+        try {
+            doctorId = Long.valueOf(request.get("doctorId").toString());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid Doctor ID format"));
+        }
 
-        String result =
-                attendanceService.checkIn(doctorId, latitude, longitude);
+        if (request.get("latitude") == null || request.get("longitude") == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "GPS location coordinates (latitude and longitude) are required for check-in."));
+        }
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "message",
-                        result
-                )
-        );
+        Double latitude, longitude, accuracy = null;
+        try {
+            latitude = Double.valueOf(request.get("latitude").toString());
+            longitude = Double.valueOf(request.get("longitude").toString());
+            if (request.get("accuracy") != null) {
+                accuracy = Double.valueOf(request.get("accuracy").toString());
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid numeric format for GPS coordinates."));
+        }
 
+        // Validate coordinate bounds
+        if (Double.isNaN(latitude) || Double.isInfinite(latitude) || latitude < -90.0 || latitude > 90.0) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Latitude must be between -90 and +90 degrees."));
+        }
+
+        if (Double.isNaN(longitude) || Double.isInfinite(longitude) || longitude < -180.0 || longitude > 180.0) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Longitude must be between -180 and +180 degrees."));
+        }
+
+        String result = attendanceService.checkIn(doctorId, latitude, longitude, accuracy);
+
+        // Determine success or error response status
+        if (result != null && result.startsWith("Check-in successful")) {
+            return ResponseEntity.ok(Map.of("message", result));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("message", result));
+        }
     }
 
     // ===== CHECK-OUT =====

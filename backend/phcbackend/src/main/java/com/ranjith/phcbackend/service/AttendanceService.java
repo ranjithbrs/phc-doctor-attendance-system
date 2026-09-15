@@ -36,17 +36,15 @@ public class AttendanceService {
 
     }
 
-    // ===== CHECK-IN WITH GEO-FENCING =====
+    // ===== CHECK-IN WITH SECURE GEO-FENCING & GPS VALIDATION =====
 
-    public String checkIn(Long doctorId, Double userLat, Double userLng) {
+    public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy) {
 
         if (doctorId == null) {
             return "Invalid doctor ID";
         }
 
-        Optional<Doctor> doctorOptional =
-                doctorRepository.findById(doctorId);
-
+        Optional<Doctor> doctorOptional = doctorRepository.findById(doctorId);
         if (doctorOptional.isEmpty()) {
             return "Doctor not found";
         }
@@ -54,12 +52,41 @@ public class AttendanceService {
         Doctor doctor = doctorOptional.get();
         LocalDate today = LocalDate.now();
 
-        Optional<Attendance> existing =
-                attendanceRepository.findByDoctorAndDate(doctor, today);
+        // Validate coordinate existence
+        if (userLat == null || userLng == null) {
+            return "GPS location coordinates (latitude and longitude) are required for check-in.";
+        }
 
+        // Validate numeric validity & bounds (-90 to +90 for lat, -180 to +180 for lng)
+        if (Double.isNaN(userLat) || Double.isInfinite(userLat) || userLat < -90.0 || userLat > 90.0) {
+            return "Invalid latitude value. Must be between -90 and +90 degrees.";
+        }
+
+        if (Double.isNaN(userLng) || Double.isInfinite(userLng) || userLng < -180.0 || userLng > 180.0) {
+            return "Invalid longitude value. Must be between -180 and +180 degrees.";
+        }
+
+        // Validate GPS Accuracy threshold (Max 200 meters allowed uncertainty)
+        final double MAX_ALLOWED_ACCURACY_METERS = 200.0;
+        if (accuracy != null) {
+            if (Double.isNaN(accuracy) || Double.isInfinite(accuracy) || accuracy < 0) {
+                return "Invalid GPS accuracy value.";
+            }
+            if (accuracy > MAX_ALLOWED_ACCURACY_METERS) {
+                return String.format("GPS accuracy is insufficient (±%.0fm). Maximum allowed uncertainty is %.0fm. Please move to an open area with better reception.", accuracy, MAX_ALLOWED_ACCURACY_METERS);
+            }
+        }
+
+        // Validate assigned PHC coordinates
+        PHC phc = doctor.getPhc();
+        if (phc == null || phc.getLatitude() == null || phc.getLongitude() == null) {
+            return "Assigned Primary Health Centre (PHC) coordinates are not configured in the database.";
+        }
+
+        Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
         if (existing.isPresent()) {
             Attendance attendance = existing.get();
-            if (attendance.getStatus().equals("PRESENT") || attendance.getStatus().equals("COMPLETED")) {
+            if ("PRESENT".equals(attendance.getStatus()) || "COMPLETED".equals(attendance.getStatus())) {
                 return "Already checked in today";
             }
         }
@@ -68,33 +95,29 @@ public class AttendanceService {
         attendance.setDoctor(doctor);
         attendance.setDate(today);
 
-        // Geo-fencing check against assigned PHC coordinates
-        PHC phc = doctor.getPhc();
-        boolean isWithinRange = true;
-        double distanceMeters = 0.0;
+        // Calculate distance using Haversine formula
+        double distanceMeters = calculateDistanceInMeters(userLat, userLng, phc.getLatitude(), phc.getLongitude());
+        final double MAX_ALLOWED_DISTANCE_METERS = 500.0; // 500 meters geo-fence radius
 
-        if (phc != null && phc.getLatitude() != null && phc.getLongitude() != null && userLat != null && userLng != null) {
-            distanceMeters = calculateDistanceInMeters(userLat, userLng, phc.getLatitude(), phc.getLongitude());
-            final double MAX_ALLOWED_DISTANCE_METERS = 500.0; // 500 meters radius
-
-            if (distanceMeters > MAX_ALLOWED_DISTANCE_METERS) {
-                isWithinRange = false;
-            }
-        }
-
-        if (!isWithinRange) {
+        if (distanceMeters > MAX_ALLOWED_DISTANCE_METERS) {
             attendance.setStatus("ABSENT");
             attendanceRepository.save(attendance);
-            return String.format("Outside PHC location (%.0fm away from %s). Marked as ABSENT.", distanceMeters, phc != null ? phc.getName() : "PHC");
+            return String.format("Outside PHC location (%.0fm away from %s). Maximum allowed distance is %.0fm. Attendance marked as ABSENT.", distanceMeters, phc.getName(), MAX_ALLOWED_DISTANCE_METERS);
         }
 
         attendance.setCheckInTime(LocalTime.now());
         attendance.setStatus("PRESENT");
         attendanceRepository.save(attendance);
 
-        return phc != null && phc.getLatitude() != null 
-            ? String.format("Check-in successful! Distance to %s: %.0fm.", phc.getName(), distanceMeters)
-            : "Check-in successful";
+        return String.format("Check-in successful! Verified distance to %s: %.0fm.", phc.getName(), distanceMeters);
+    }
+
+    public String checkIn(Long doctorId, Double userLat, Double userLng) {
+        return checkIn(doctorId, userLat, userLng, null);
+    }
+
+    public String checkIn(Long doctorId) {
+        return checkIn(doctorId, null, null, null);
     }
 
     /**
@@ -109,10 +132,6 @@ public class AttendanceService {
                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
-    }
-
-    public String checkIn(Long doctorId) {
-        return checkIn(doctorId, null, null);
     }
 
     // ===== CHECK-OUT =====

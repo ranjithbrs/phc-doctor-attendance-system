@@ -137,7 +137,7 @@ document.addEventListener("DOMContentLoaded", loadStatus);
 // ===== CHECK IN =====
 document.getElementById("checkInBtn").addEventListener("click", () => {
   if (!navigator.geolocation) {
-    showAlert("Geolocation not supported by your browser.", "danger");
+    showAlert("Geolocation is not supported by your browser.", "danger");
     return;
   }
 
@@ -145,34 +145,66 @@ document.getElementById("checkInBtn").addEventListener("click", () => {
   btn.innerHTML = '<span class="spinner"></span> Getting location...';
   btn.disabled = true;
 
+  const geoOptions = {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0
+  };
+
   navigator.geolocation.getCurrentPosition(
     pos => {
-      const { latitude, longitude } = pos.coords;
+      const { latitude, longitude, accuracy } = pos.coords;
       initMap(latitude, longitude);
+
+      // GPS Accuracy threshold check (200 meters)
+      const MAX_ACCURACY_THRESHOLD = 200;
+      if (accuracy && accuracy > MAX_ACCURACY_THRESHOLD) {
+        showAlert(`GPS accuracy is insufficient (±${Math.round(accuracy)}m). Please move to an open area with better GPS reception and try again.`, "danger");
+        btn.innerHTML = "✅ Check In";
+        btn.disabled  = false;
+        return;
+      }
 
       fetch(`${API_BASE_URL}/attendance/checkin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doctorId: Number(doctorId), latitude, longitude })
+        body: JSON.stringify({ doctorId: Number(doctorId), latitude, longitude, accuracy })
       })
-      .then(res => res.json())
-      .then(data => {
-        showAlert(data.message, "success");
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          showAlert(data.message || "Check-in rejected by server.", "danger");
+        } else {
+          showAlert(data.message, "success");
+        }
         loadStatus();
         btn.innerHTML = "✅ Check In";
         btn.disabled  = false;
       })
       .catch(() => {
-        showAlert("Check-in failed. Please try again.", "danger");
+        showAlert("Check-in failed due to server/network error. Please try again.", "danger");
         btn.innerHTML = "✅ Check In";
         btn.disabled  = false;
       });
     },
-    () => {
-      showAlert("GPS permission denied. Please enable location access.", "danger");
+    error => {
+      let errorMsg = "An error occurred while retrieving your location. Please try again.";
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          errorMsg = "Location permission is required to verify attendance. Please allow location access and try again.";
+          break;
+        case error.POSITION_UNAVAILABLE:
+          errorMsg = "Unable to determine your current location. Please check GPS/location services and try again.";
+          break;
+        case error.TIMEOUT:
+          errorMsg = "Location request timed out. Please move to an area with better GPS reception and try again.";
+          break;
+      }
+      showAlert(errorMsg, "danger");
       btn.innerHTML = "✅ Check In";
       btn.disabled  = false;
-    }
+    },
+    geoOptions
   );
 });
 
