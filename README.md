@@ -25,7 +25,9 @@
 ## 📑 Table of Contents
 - [System Architecture & Workflow](#-system-architecture--workflow)
 - [Live Test Credentials](#-demo-test-credentials)
-- [Key Features](#-key-features--capabilities)
+- [Key Features & Security](#-key-features--capabilities)
+- [GPS Location Validation & Accuracy Thresholds](#-gps-location-validation--security)
+- [Automated Testing & Quality Assurance](#-automated-testing--quality-assurance)
 - [Database Schema (ER Diagram)](#-database-entity-relationship-schema)
 - [REST API Specifications](#-api-endpoints-summary)
 - [Repository Structure](#-repository-directory-structure)
@@ -46,23 +48,24 @@ flowchart TD
         B -->|DDHS Admin Role| D[District Central Surveillance]
         
         C --> E[Browser HTML5 Geolocation API]
-        E --> F[Leaflet.js Map: Real-time Coords + 500m Boundary]
-        F --> G[POST /attendance/checkin with GPS Fix]
+        E -->|High Accuracy Mode| F[Accuracy Check: <= 200m]
+        F -->|Passed| G[Leaflet.js Map: Real-time Coords + 500m Boundary]
+        G --> H[POST /attendance/checkin with GPS Fix + Accuracy]
     end
 
     subgraph Backend["⚙️ Backend Microservice (Spring Boot 3 + Java 21)"]
-        G --> H[AttendanceController]
-        H --> I[AttendanceService]
-        I --> J{Haversine Spherical Distance Engine}
-        J -->|Distance <= 500m| K[Assign Status: PRESENT ✅]
-        J -->|Distance > 500m| L[Assign Status: ABSENT ❌]
+        H --> I[AttendanceController]
+        I -->|Validate Lat/Lng Bounds & Accuracy| J[AttendanceService]
+        J --> K{Haversine Spherical Distance Engine}
+        K -->|Distance <= 500m| L[Assign Status: PRESENT ✅]
+        K -->|Distance > 500m| M[Assign Status: ABSENT ❌]
         D --> N[DashboardService: District Aggregates]
     end
 
     subgraph Database["🗄️ Relational Persistence (Cloud MySQL)"]
-        K --> M[(MySQL Database Cluster)]
-        L --> M
-        N --> M
+        L --> O[(MySQL Database Cluster)]
+        M --> O
+        N --> O
     end
 ```
 
@@ -91,12 +94,52 @@ Test both role-based workflows using the following pre-seeded accounts:
 - 📍 **Haversine Geo-Fencing Engine**: Implements the mathematical Haversine spherical formula on the server side to determine exact geodesic distance between doctor GPS coordinates and designated PHC facilities:
   $$d = 2r \arcsin\left(\sqrt{\sin^2\left(\frac{\Delta \phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta \lambda}{2}\right)}\right)$$
 - ⭕ **500-Meter Geo-Fence Boundary**: Automatically validates presence within a strict 500m radius; flags off-site requests as `ABSENT` with exact distance variance feedback.
+- 🎯 **GPS Accuracy Threshold Enforcement**: Client and server independently reject low-accuracy positioning fixes (uncertainty > 200m) to block coarse IP/cellular triangulation.
+- 🛡️ **Server-Side Input Validation**: Backend strictly validates latitude (-90 to +90) and longitude (-180 to +180), rejects `null`/`NaN`/`Infinity` values, and mandates location verification.
 - 🛑 **Check-Out Integrity Protection**: Prevents overwriting `ABSENT` records during check-out and strictly enforces check-out operations solely against valid active `PRESENT` sessions.
 - 🗺️ **Interactive Leaflet.js Spatial Mapping**: Real-time rendering of the doctor's current geolocation marker against an overlaid translucent boundary circle of the medical centre.
 - 🔐 **Role-Based Access Control (RBAC)**: Segregated authentication workflows and route guards for Medical Officers (`DOCTOR`) and District Health Officers (`ADMIN`).
 - 📊 **Central Surveillance Analytics**: District administration view delivering aggregated PHC statistics, attendance percentages, present/absent ratios, and doctor roster tracking.
 - 📅 **Filtered Historical Audit**: Searchable personal attendance logs with check-in/check-out timestamps and status tags.
 - 🐳 **Docker Multi-Stage Build**: Minimized production container image powered by `eclipse-temurin:21-jre-jammy` for rapid deployments.
+
+---
+
+## 🎯 GPS Location Validation & Security
+
+The system enforces multi-layered location verification on both frontend and backend tiers:
+
+### Frontend Error & Accuracy Safeguards
+1. **Permission Denied**: Notifies doctor that location access is required and halts check-in without sending bad requests.
+2. **Position Unavailable**: Detects device GPS failures and instructs user to check location services.
+3. **Timeout Protection**: Enforces a 10-second timeout window to prevent hanging requests in low-reception zones.
+4. **Accuracy Threshold**: Checks `pos.coords.accuracy`. Readings exceeding 200m uncertainty (e.g. coarse cell tower triangulation) are blocked until a stronger GPS fix is acquired.
+
+### Backend Independent Verification
+1. **Coordinate Boundary Enforcement**: Verifies latitude $\in [-90, +90]$ and longitude $\in [-180, +180]$.
+2. **Malformed Payload Guard**: Rejects `null`, missing, `NaN`, or `Infinity` coordinate values.
+3. **Independent Haversine Calculation**: Distance is computed entirely on the backend against PHC database coordinates; client-supplied distance values are ignored.
+
+---
+
+## 🧪 Automated Testing & Quality Assurance
+
+The backend repository includes JUnit test suites (`AttendanceValidationTest.java`) achieving **100% pass rate**:
+
+```bash
+# Run backend test suite
+cd backend/phcbackend
+./mvnw test
+```
+
+| Test Case | Objective | Result |
+| :--- | :--- | :--- |
+| `testValidCheckInWithinGeoFence` | Verifies check-in success inside 500m PHC radius | **PASSED** ✅ |
+| `testCheckInOutsideGeoFence` | Verifies rejection & ABSENT status when outside 500m radius | **PASSED** ✅ |
+| `testCheckInMissingCoordinates` | Ensures `null` lat/lng payload is rejected with 400 Bad Request | **PASSED** ✅ |
+| `testCheckInInvalidLatitude` | Rejects out-of-bounds latitude (e.g. +100.0°) | **PASSED** ✅ |
+| `testCheckInInvalidLongitude` | Rejects out-of-bounds longitude (e.g. -200.0°) | **PASSED** ✅ |
+| `testCheckInPoorAccuracyThreshold` | Rejects positioning fix with uncertainty > 200m | **PASSED** ✅ |
 
 ---
 
@@ -158,7 +201,7 @@ erDiagram
 ### Attendance Routes (`/attendance`)
 | Method | Endpoint | Description | Payload / Query |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/attendance/checkin` | Submits geo-fenced check-in with GPS fix | `{ "doctorId": 1, "latitude": 11.0168, "longitude": 76.9558 }` |
+| `POST` | `/attendance/checkin` | Submits geo-fenced check-in with GPS fix & accuracy | `{ "doctorId": 1, "latitude": 11.0168, "longitude": 76.9558, "accuracy": 10.0 }` |
 | `PUT` | `/attendance/checkout` | Records check-out timestamp | `{ "doctorId": 1 }` |
 | `GET` | `/attendance/status/{doctorId}` | Gets current day's check-in status | Path Param: `doctorId` |
 | `GET` | `/attendance/history/{doctorId}` | Fetches historical attendance records | Query: `from=YYYY-MM-DD&to=YYYY-MM-DD` |
@@ -194,15 +237,17 @@ phc-doctor-attendance-system/
     └── phcbackend/
         ├── Dockerfile              # Multi-stage production container build
         ├── pom.xml                 # Maven configuration & Java 21 dependencies
-        └── src/
-            ├── main/java/com/ranjith/phcbackend/
-            │   ├── controller/     # REST Controllers (Auth, Attendance, Dashboard)
-            │   ├── model/          # JPA Entities (Division, PHC, Doctor, Attendance)
-            │   ├── repository/     # Spring Data JPA Repository interfaces
-            │   └── service/        # Haversine distance engine & business services
-            └── main/resources/
-                ├── application.properties
-                └── data.sql        # Seed data script
+        ├── src/
+        │   ├── main/java/com/ranjith/phcbackend/
+        │   │   ├── controller/     # REST Controllers (Auth, Attendance, Dashboard)
+        │   │   ├── model/          # JPA Entities (Division, PHC, Doctor, Attendance)
+        │   │   ├── repository/     # Spring Data JPA Repository interfaces
+        │   │   └── service/        # Haversine distance engine & business services
+        │   └── main/resources/
+        │       ├── application.properties
+        │       └── data.sql        # Seed data script
+        └── src/test/java/com/ranjith/phcbackend/
+            └── AttendanceValidationTest.java  # Automated JUnit GPS test suite
 ```
 
 ---
