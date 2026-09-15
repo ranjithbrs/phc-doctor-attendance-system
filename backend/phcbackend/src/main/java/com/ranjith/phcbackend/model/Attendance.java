@@ -18,7 +18,11 @@ public class Attendance {
 
     private LocalTime checkOutTime;
 
-    private String status; // PRESENT / ABSENT / LATE
+    private String status; // PRESENT / ABSENT / LATE / COMPLETED
+
+    private LocalTime lastPresencePingTime;
+
+    private Integer presenceBreachCount = 0;
 
     @ManyToOne
     @JoinColumn(name = "doctor_id", nullable = false)
@@ -46,6 +50,8 @@ public class Attendance {
     public LocalTime getCheckOutTime() { return checkOutTime; }
     public String getStatus() { return status; }
     public Doctor getDoctor() { return doctor; }
+    public LocalTime getLastPresencePingTime() { return lastPresencePingTime; }
+    public Integer getPresenceBreachCount() { return presenceBreachCount != null ? presenceBreachCount : 0; }
 
     // Setters
 
@@ -54,4 +60,6 @@ public class Attendance {
     public void setCheckOutTime(LocalTime checkOutTime) { this.checkOutTime = checkOutTime; }
     public void setStatus(String status) { this.status = status; }
     public void setDoctor(Doctor doctor) { this.doctor = doctor; }
+    public void setLastPresencePingTime(LocalTime lastPresencePingTime) { this.lastPresencePingTime = lastPresencePingTime; }
+    public void setPresenceBreachCount(Integer presenceBreachCount) { this.presenceBreachCount = presenceBreachCount; }
 }

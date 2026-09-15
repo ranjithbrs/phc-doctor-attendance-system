@@ -4,12 +4,16 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import com.ranjith.phcbackend.model.Attendance;
 import com.ranjith.phcbackend.model.AttendanceAuditLog;
 import com.ranjith.phcbackend.model.Doctor;
 import com.ranjith.phcbackend.model.PHC;
@@ -79,5 +83,24 @@ class AttendanceValidationTest {
         String result = attendanceService.checkIn(1L, 11.0168, 76.9558, 350.0);
         assertTrue(result.contains("GPS accuracy is insufficient"));
         verify(auditLogRepository).save(any(AttendanceAuditLog.class));
+    }
+
+    @Test
+    void testPresencePingVerified() {
+        Attendance presentAttendance = new Attendance(LocalDate.now(), LocalTime.now(), null, "PRESENT", sampleDoctor);
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now())).thenReturn(Optional.of(presentAttendance));
+
+        Map<String, Object> response = attendanceService.presencePing(1L, 11.0168, 76.9558, 15.0);
+        assertEquals("VERIFIED", response.get("status"));
+    }
+
+    @Test
+    void testPresencePingBreachWarning() {
+        Attendance presentAttendance = new Attendance(LocalDate.now(), LocalTime.now(), null, "PRESENT", sampleDoctor);
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now())).thenReturn(Optional.of(presentAttendance));
+
+        // Ping location in Chennai (far from Coimbatore PHC)
+        Map<String, Object> response = attendanceService.presencePing(1L, 13.0827, 80.2707, 15.0);
+        assertEquals("BREACH_WARNING", response.get("status"));
     }
 }

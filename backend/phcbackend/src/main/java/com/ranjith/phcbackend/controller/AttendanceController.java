@@ -164,4 +164,27 @@ public class AttendanceController {
     public ResponseEntity<?> getRecentAuditLogs() {
         return ResponseEntity.ok(attendanceService.getRecentAuditLogs());
     }
+
+    // ===== CONTINUOUS PRESENCE HEARTBEAT PING =====
+
+    @PostMapping("/presence-ping")
+    public ResponseEntity<?> presencePing(@RequestBody Map<String, Object> request) {
+        if (request == null || request.get("doctorId") == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Doctor ID is required"));
+        }
+
+        Long doctorId;
+        try {
+            doctorId = Long.valueOf(request.get("doctorId").toString());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid Doctor ID format"));
+        }
+
+        Double latitude = request.get("latitude") != null ? Double.valueOf(request.get("latitude").toString()) : null;
+        Double longitude = request.get("longitude") != null ? Double.valueOf(request.get("longitude").toString()) : null;
+        Double accuracy = request.get("accuracy") != null ? Double.valueOf(request.get("accuracy").toString()) : null;
+
+        Map<String, Object> result = attendanceService.presencePing(doctorId, latitude, longitude, accuracy);
+        return ResponseEntity.ok(result);
+    }
 }

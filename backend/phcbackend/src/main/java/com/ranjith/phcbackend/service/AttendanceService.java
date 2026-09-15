@@ -137,6 +137,90 @@ public class AttendanceService {
         return auditLogRepository.findTop50ByOrderByTimestampDesc();
     }
 
+    // ===== CONTINUOUS PRESENCE VERIFICATION (HEARTBEAT PING) =====
+
+    public java.util.Map<String, Object> presencePing(Long doctorId, Double userLat, Double userLng, Double accuracy) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+
+        if (doctorId == null) {
+            response.put("status", "REJECTED");
+            response.put("message", "Invalid doctor ID");
+            return response;
+        }
+
+        Optional<Doctor> docOpt = doctorRepository.findById(doctorId);
+        if (docOpt.isEmpty()) {
+            response.put("status", "REJECTED");
+            response.put("message", "Doctor not found");
+            return response;
+        }
+
+        Doctor doctor = docOpt.get();
+        LocalDate today = LocalDate.now();
+
+        Optional<Attendance> attendanceOpt = attendanceRepository.findByDoctorAndDate(doctor, today);
+        if (attendanceOpt.isEmpty() || !"PRESENT".equals(attendanceOpt.get().getStatus())) {
+            response.put("status", "NO_SESSION");
+            response.put("message", "No active check-in session found for today.");
+            return response;
+        }
+
+        Attendance attendance = attendanceOpt.get();
+
+        if (userLat == null || userLng == null || Double.isNaN(userLat) || Double.isInfinite(userLat) ||
+            userLat < -90.0 || userLat > 90.0 || Double.isNaN(userLng) || Double.isInfinite(userLng) ||
+            userLng < -180.0 || userLng > 180.0) {
+            logAudit(doctor, "PRESENCE_PING", userLat, userLng, accuracy, null, "REJECTED_INVALID_COORDINATES", "Invalid GPS coordinates during presence ping");
+            response.put("status", "REJECTED");
+            response.put("message", "Invalid GPS coordinates during presence ping.");
+            return response;
+        }
+
+        if (accuracy != null && accuracy > 200.0) {
+            logAudit(doctor, "PRESENCE_PING", userLat, userLng, accuracy, null, "REJECTED_POOR_ACCURACY", String.format("Presence ping skipped: uncertainty ±%.0fm > 200m", accuracy));
+            response.put("status", "POOR_ACCURACY");
+            response.put("message", String.format("Presence ping skipped due to low accuracy (±%.0fm).", accuracy));
+            return response;
+        }
+
+        PHC phc = doctor.getPhc();
+        if (phc == null || phc.getLatitude() == null || phc.getLongitude() == null) {
+            response.put("status", "REJECTED");
+            response.put("message", "Assigned PHC coordinates not configured.");
+            return response;
+        }
+
+        double distanceMeters = calculateDistanceInMeters(userLat, userLng, phc.getLatitude(), phc.getLongitude());
+        final double MAX_ALLOWED = 500.0;
+
+        LocalTime now = LocalTime.now();
+        attendance.setLastPresencePingTime(now);
+
+        if (distanceMeters > MAX_ALLOWED) {
+            int breaches = attendance.getPresenceBreachCount() + 1;
+            attendance.setPresenceBreachCount(breaches);
+            attendanceRepository.save(attendance);
+
+            logAudit(doctor, "PRESENCE_PING", userLat, userLng, accuracy, distanceMeters, "PRESENCE_BREACH_WARNING", String.format("Presence breach detected: %.0fm away from %s (Breach #%d)", distanceMeters, phc.getName(), breaches));
+
+            response.put("status", "BREACH_WARNING");
+            response.put("distanceMeters", distanceMeters);
+            response.put("breachCount", breaches);
+            response.put("message", String.format("Presence warning: You are %.0fm away from %s boundary.", distanceMeters, phc.getName()));
+            return response;
+        }
+
+        attendanceRepository.save(attendance);
+
+        logAudit(doctor, "PRESENCE_PING", userLat, userLng, accuracy, distanceMeters, "PRESENCE_VERIFIED", String.format("Continuous presence verified inside %s (%.0fm away)", phc.getName(), distanceMeters));
+
+        response.put("status", "VERIFIED");
+        response.put("distanceMeters", distanceMeters);
+        response.put("lastPingTime", now.toString());
+        response.put("message", String.format("Continuous presence verified at %s (%.0fm).", phc.getName(), distanceMeters));
+        return response;
+    }
+
     public String checkIn(Long doctorId, Double userLat, Double userLng) {
         return checkIn(doctorId, userLat, userLng, null);
     }
