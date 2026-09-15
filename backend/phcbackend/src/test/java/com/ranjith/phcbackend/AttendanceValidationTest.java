@@ -175,4 +175,21 @@ class AttendanceValidationTest {
         assertEquals("SUCCESS", syncResults.get(0).get("status"));
         verify(attendanceRepository).save(any(Attendance.class));
     }
+
+    @Test
+    void testAnomalyDetectionEngine() {
+        Mockito.when(doctorRepository.findAll()).thenReturn(List.of(sampleDoctor));
+
+        AttendanceAuditLog spoofLog = new AttendanceAuditLog(LocalDateTime.now(), "CHECK_IN_ATTEMPT", 11.0168, 76.9558, 10.0, 50000.0, "FLAGGED_IMPOSSIBLE_SPEED", "Impossible travel speed: 300 km/h", sampleDoctor);
+        Mockito.when(auditLogRepository.findByDoctorOrderByTimestampDesc(sampleDoctor)).thenReturn(List.of(spoofLog));
+
+        Attendance breachAttendance = new Attendance(LocalDate.now(), LocalTime.of(9, 0), LocalTime.of(17, 0), "PRESENT", sampleDoctor);
+        breachAttendance.setPresenceBreachCount(4);
+        Mockito.when(attendanceRepository.findByDoctor(sampleDoctor)).thenReturn(List.of(breachAttendance));
+
+        List<Map<String, Object>> anomalies = attendanceService.getAttendanceAnomalies();
+        assertFalse(anomalies.isEmpty());
+        assertTrue(anomalies.stream().anyMatch(a -> "SUSPECTED_GPS_SPOOFING".equals(a.get("anomalyType"))));
+        assertTrue(anomalies.stream().anyMatch(a -> "HIGH_PRESENCE_BREACHES".equals(a.get("anomalyType"))));
+    }
 }

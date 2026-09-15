@@ -232,4 +232,15 @@ public class AttendanceController {
             "syncedRecords", results
         ));
     }
+
+    // ===== ATTENDANCE ANOMALY DETECTION =====
+
+    @GetMapping("/anomalies")
+    public ResponseEntity<?> getAnomalies() {
+        List<Map<String, Object>> anomalies = attendanceService.getAttendanceAnomalies();
+        return ResponseEntity.ok(Map.of(
+            "totalAnomalies", anomalies.size(),
+            "anomalies", anomalies
+        ));
+    }
 }

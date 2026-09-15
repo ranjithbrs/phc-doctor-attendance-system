@@ -737,4 +737,72 @@ public class AttendanceService {
         return results;
     }
 
+    // ===== ANOMALY DETECTION ENGINE =====
+
+    public List<java.util.Map<String, Object>> getAttendanceAnomalies() {
+        List<java.util.Map<String, Object>> anomalies = new java.util.ArrayList<>();
+        List<Doctor> doctors = doctorRepository.findAll();
+
+        for (Doctor doctor : doctors) {
+            // 1. Check for location integrity / spoofing alerts in audit logs
+            List<AttendanceAuditLog> auditLogs = auditLogRepository.findByDoctorOrderByTimestampDesc(doctor);
+            if (auditLogs != null) {
+                for (AttendanceAuditLog log : auditLogs) {
+                    if ("FLAGGED_IMPOSSIBLE_SPEED".equals(log.getVerificationResult())) {
+                        java.util.Map<String, Object> anomaly = new java.util.HashMap<>();
+                        anomaly.put("doctorId", doctor.getId());
+                        anomaly.put("doctorName", doctor.getName());
+                        anomaly.put("phcName", doctor.getPhc() != null ? doctor.getPhc().getName() : "Unassigned");
+                        anomaly.put("anomalyType", "SUSPECTED_GPS_SPOOFING");
+                        anomaly.put("severity", "CRITICAL");
+                        anomaly.put("description", "Impossible travel velocity detected between GPS fixes");
+                        anomaly.put("evidence", log.getRemarks());
+                        anomaly.put("detectedAt", log.getTimestamp().toString());
+                        anomalies.add(anomaly);
+                        break;
+                    }
+                }
+            }
+
+            // 2. Check for high presence breach count & frequent late check-ins in attendance history
+            List<Attendance> attendances = attendanceRepository.findByDoctor(doctor);
+            if (attendances != null) {
+                int lateCount = 0;
+                for (Attendance att : attendances) {
+                    if (att.getPresenceBreachCount() != null && att.getPresenceBreachCount() >= 3) {
+                        java.util.Map<String, Object> anomaly = new java.util.HashMap<>();
+                        anomaly.put("doctorId", doctor.getId());
+                        anomaly.put("doctorName", doctor.getName());
+                        anomaly.put("phcName", doctor.getPhc() != null ? doctor.getPhc().getName() : "Unassigned");
+                        anomaly.put("anomalyType", "HIGH_PRESENCE_BREACHES");
+                        anomaly.put("severity", "HIGH");
+                        anomaly.put("description", String.format("%d continuous presence geo-fence breaches recorded on %s", att.getPresenceBreachCount(), att.getDate()));
+                        anomaly.put("evidence", String.format("Breaches: %d", att.getPresenceBreachCount()));
+                        anomaly.put("detectedAt", att.getDate().toString());
+                        anomalies.add(anomaly);
+                    }
+
+                    if ("LATE".equals(att.getStatus())) {
+                        lateCount++;
+                    }
+                }
+
+                if (lateCount >= 2) {
+                    java.util.Map<String, Object> anomaly = new java.util.HashMap<>();
+                    anomaly.put("doctorId", doctor.getId());
+                    anomaly.put("doctorName", doctor.getName());
+                    anomaly.put("phcName", doctor.getPhc() != null ? doctor.getPhc().getName() : "Unassigned");
+                    anomaly.put("anomalyType", "FREQUENT_LATE_ARRIVALS");
+                    anomaly.put("severity", "MEDIUM");
+                    anomaly.put("description", String.format("%d late check-ins recorded in attendance history", lateCount));
+                    anomaly.put("evidence", String.format("Total late days: %d", lateCount));
+                    anomaly.put("detectedAt", LocalDate.now().toString());
+                    anomalies.add(anomaly);
+                }
+            }
+        }
+
+        return anomalies;
+    }
+
 }
