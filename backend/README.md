@@ -1,6 +1,6 @@
 # ⚙️ PHC Doctor Attendance System - Backend Service
 
-The backend module is a production-ready **Spring Boot 3** REST API written in **Java 21**, managing authentication, geo-fenced attendance checks, and district health surveillance analytics.
+The backend module is a production-ready **Spring Boot 3** REST API written in **Java 21**, managing BCrypt authentication, Haversine geo-fencing, continuous presence heartbeat verification, anti-spoofing heuristics, offline batch synchronization, and district health surveillance analytics.
 
 ---
 
@@ -9,9 +9,10 @@ The backend module is a production-ready **Spring Boot 3** REST API written in *
 - **Framework:** Spring Boot 3.5.x
 - **Language:** Java 21 (Eclipse Temurin JDK)
 - **Data Layer:** Spring Data JPA + Hibernate ORM
-- **Database:** MySQL 8.0+
+- **Database:** Aiven Cloud MySQL 8.x / Local MySQL 8.0+
 - **Build Tool:** Apache Maven (`pom.xml`)
 - **Containerization:** Multi-stage `Dockerfile`
+- **Security:** BCrypt Password Hashing + Token Session Management
 
 ---
 
@@ -22,85 +23,66 @@ backend/phcbackend/src/main/java/com/ranjith/phcbackend/
 ├── PhcbackendApplication.java     # Main Spring Boot application entrypoint
 ├── controller/
 │   ├── AuthController.java        # Handles /auth/login, /auth/register, /auth/phcs
-│   ├── AttendanceController.java  # Handles /attendance/checkin, checkout, status, history
+│   ├── AttendanceController.java  # Handles /attendance checkin, checkout, presence-ping, audit, alerts, offline-sync, anomalies
 │   └── DashboardController.java   # Handles /dashboard/summary, phc-overview
 ├── model/
 │   ├── Doctor.java                # JPA Entity for doctors and administrators
-│   ├── PHC.java                   # JPA Entity for Primary Health Centres & GPS coords
-│   ├── Attendance.java            # JPA Entity for daily attendance logs
+│   ├── PHC.java                   # JPA Entity for Primary Health Centres & configurable radius
+│   ├── Attendance.java            # JPA Entity for daily attendance logs & presence pings
+│   ├── AttendanceAuditLog.java   # JPA Entity for detailed GPS audit evidence
 │   └── Division.java              # JPA Entity for district medical divisions
 ├── repository/
 │   ├── DoctorRepository.java      # JPA Repository interface for Doctor entity
 │   ├── PHCRepository.java         # JPA Repository interface for PHC entity
 │   ├── AttendanceRepository.java  # JPA Repository interface for Attendance entity
+│   ├── AttendanceAuditLogRepository.java # JPA Repository interface for AttendanceAuditLog entity
 │   └── DivisionRepository.java    # JPA Repository interface for Division entity
+├── security/
+│   └── SecurityUtil.java          # BCrypt password hashing & session token generator
 └── service/
-    ├── AttendanceService.java     # Core Haversine geo-fencing & status transition logic
-    ├── AuthService.java           # Authentication, user creation & PHC listing
+    ├── AttendanceService.java     # Haversine engine, anti-spoofing velocity, offline sync & anomaly scanner
+    ├── AuthService.java           # Authentication, password verification & PHC listing
     └── DashboardService.java      # Attendance aggregation & percentage calculation
 ```
 
 ---
 
-## 📐 Geo-Fencing Logic (Haversine Formula)
+## 📐 Geo-Fencing & Verification Logic
 
 When a doctor submits a check-in request via `POST /attendance/checkin`:
-1. The backend retrieves the assigned PHC building's latitude and longitude.
-2. The `AttendanceService` calculates the great-circle distance between the live doctor GPS coordinates and the assigned PHC using the Haversine formula:
+1. The backend retrieves the assigned PHC building's latitude, longitude, and custom radius (`phc.getRadiusMeters()`).
+2. The `AttendanceService` calculates the great-circle distance between doctor GPS coordinates and PHC coordinates using the Haversine formula:
    \[
    a = \sin^2\left(\frac{\Delta \phi}{2}\right) + \cos(\phi_1) \cos(\phi_2) \sin^2\left(\frac{\Delta \lambda}{2}\right)
    \]
    \[
    c = 2 \cdot \text{atan2}\left(\sqrt{a}, \sqrt{1-a}\right), \quad d = R \cdot c \quad (\text{where } R = 6,371,000 \text{ m})
    \]
-3. If distance \(d \le 500\text{ meters}\): Status is set to **`PRESENT`** and check-in time recorded.
-4. If distance \(d > 500\text{ meters}\): Status is set to **`ABSENT`** with an explanatory distance warning.
+3. **Anti-Spoofing & Velocity Evaluation**: Evaluates travel speed between recent fixes. If velocity exceeds 250 km/h for fixes >500m apart within 4 hours, the request is flagged as `FLAGGED_IMPOSSIBLE_SPEED` and rejected.
+4. **Distance Check**:
+   - If distance \(d \le \text{phc.getRadiusMeters()}\): Status is set to **`PRESENT`** (or **`LATE`** if checked in after 09:15 AM grace cutoff).
+   - If distance \(d > \text{phc.getRadiusMeters()}\): Status is set to **`ABSENT`**.
+5. **Audit Trail**: Every check-in, check-out, and ping attempt persists an `AttendanceAuditLog` entry.
 
 ---
 
 ## ⚙️ Environment Variables
 
-The application can be configured using environment variables in production (e.g., Docker / Render / Railway):
+The application can be configured using environment variables in production (e.g. Render / Docker):
 
-| Environment Variable | Description | Default / Example |
+| Environment Variable | Description | Example Value |
 | :--- | :--- | :--- |
-| `SPRING_DATASOURCE_URL` | MySQL JDBC connection string | `jdbc:mysql://localhost:3306/phc_db` |
-| `SPRING_DATASOURCE_USERNAME` | MySQL database user | `root` |
-| `SPRING_DATASOURCE_PASSWORD` | MySQL database password | `secret` |
-| `SERVER_PORT` | HTTP Server Port | `8080` |
+| `SPRING_DATASOURCE_URL` | MySQL JDBC connection string | `jdbc:mysql://mysql-1f6018f4-br3843311-c379.l.aivencloud.com:10531/defaultdb?sslMode=REQUIRED` |
+| `SPRING_DATASOURCE_USERNAME` | MySQL database user | `avnadmin` |
+| `SPRING_DATASOURCE_PASSWORD` | MySQL database password | `secret_password` |
+| `PORT` | Dynamic HTTP Server Port | `10000` |
 
 ---
 
-## 🚀 Running & Building Locally
+## 🧪 Automated Unit Testing (JUnit 5 + Mockito)
 
-### Run via Maven Wrapper
 ```bash
-# Windows
-.\mvnw.cmd spring-boot:run
-
-# Linux / macOS
-./mvnw spring-boot:run
+cd backend/phcbackend
+.\mvnw.cmd test
 ```
-
-### Build Executable JAR
-```bash
-# Windows
-.\mvnw.cmd clean package -DskipTests
-
-# Linux / macOS
-./mvnw clean package -DskipTests
-```
-The compiled JAR will be located at `target/phcbackend-0.0.1-SNAPSHOT.jar`.
-
-### Run via Docker
-```bash
-# Build image
-docker build -t phc-backend .
-
-# Run container
-docker run -p 8080:8080 \
-  -e SPRING_DATASOURCE_URL="jdbc:mysql://host.docker.internal:3306/phc_db" \
-  -e SPRING_DATASOURCE_USERNAME="root" \
-  -e SPRING_DATASOURCE_PASSWORD="password" \
-  phc-backend
-```
+- **15 / 15 Tests Passing (`BUILD SUCCESS`)** covering check-in validation, accuracy thresholds, presence pings, anti-spoofing velocity checks, absentee alerts, configurable PHC radii, shift grace period rules, offline batch sync, and anomaly detection.
