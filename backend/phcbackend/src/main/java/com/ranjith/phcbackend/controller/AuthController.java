@@ -53,7 +53,15 @@ public class AuthController {
         String password = (String) request.get("password");
         String specialization = (String) request.get("specialization");
         String role = (String) request.getOrDefault("role", "DOCTOR");
-        Long phcId = Long.valueOf(request.get("phcId").toString());
+        if (request.get("phcId") == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "PHC selection is required"));
+        }
+        Long phcId;
+        try {
+            phcId = Long.valueOf(request.get("phcId").toString());
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid PHC ID format"));
+        }
 
         Map<String, Object> registerResponse = authService.register(name, email, password, specialization, role, phcId);
 

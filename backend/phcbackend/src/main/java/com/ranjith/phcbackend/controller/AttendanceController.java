@@ -26,12 +26,8 @@ public class AttendanceController {
 
     private final AttendanceService attendanceService;
 
-    public AttendanceController(
-            AttendanceService attendanceService
-    ) {
-
+    public AttendanceController(AttendanceService attendanceService) {
         this.attendanceService = attendanceService;
-
     }
 
     // ===== CHECK-IN =====
@@ -45,7 +41,7 @@ public class AttendanceController {
         Long doctorId;
         try {
             doctorId = Long.valueOf(request.get("doctorId").toString());
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid Doctor ID format"));
         }
 
@@ -86,145 +82,74 @@ public class AttendanceController {
     // ===== CHECK-OUT =====
 
     @PutMapping("/checkout")
-
-    public ResponseEntity<?> checkOut(
-            @RequestBody Map<String, Object> request
-    ) {
-
-        Long doctorId =
-                Long.valueOf(
-                        request.get("doctorId").toString()
-                );
-
-        if (doctorId == null) {
-
-            return ResponseEntity
-                    .badRequest()
-                    .body(
-                            Map.of(
-                                    "message",
-                                    "Doctor ID is required"
-                            )
-                    );
-
+    public ResponseEntity<?> checkOut(@RequestBody Map<String, Object> request) {
+        if (request == null || request.get("doctorId") == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Doctor ID is required"));
         }
 
-        String result =
-                attendanceService.checkOut(doctorId);
+        Long doctorId;
+        try {
+            doctorId = Long.valueOf(request.get("doctorId").toString());
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid Doctor ID format"));
+        }
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "message",
-                        result
-                )
-        );
-
+        String result = attendanceService.checkOut(doctorId);
+        return ResponseEntity.ok(Map.of("message", result));
     }
 
     // ===== MARK ABSENT =====
 
     @PostMapping("/absent")
+    public ResponseEntity<?> markAbsent(@RequestBody Map<String, Object> request) {
+        if (request == null || request.get("doctorId") == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Doctor ID is required"));
+        }
 
-    public ResponseEntity<?> markAbsent(
-            @RequestBody Map<String, Object> request
-    ) {
-
-        Long doctorId =
-                Long.valueOf(
-                        request.get("doctorId").toString()
-                );
+        Long doctorId;
+        try {
+            doctorId = Long.valueOf(request.get("doctorId").toString());
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid Doctor ID format"));
+        }
 
         attendanceService.markAbsent(doctorId);
-
-        return ResponseEntity.ok(
-
-                Map.of(
-                        "message",
-                        "Doctor marked absent successfully"
-                )
-
-        );
-
+        return ResponseEntity.ok(Map.of("message", "Doctor marked absent successfully"));
     }
 
     // ===== TODAY STATUS =====
 
     @GetMapping("/status/{doctorId}")
-
-    public ResponseEntity<?> getTodayStatus(
-            @PathVariable Long doctorId
-    ) {
-
-        String status =
-                attendanceService.getTodayStatus(
-                        doctorId
-                );
-
-        Map<String, String> response =
-                new HashMap<>();
-
+    public ResponseEntity<?> getTodayStatus(@PathVariable Long doctorId) {
+        String status = attendanceService.getTodayStatus(doctorId);
+        Map<String, String> response = new HashMap<>();
         response.put("status", status);
-
         return ResponseEntity.ok(response);
-
     }
 
     // ===== HISTORY =====
 
     @GetMapping("/history/{doctorId}")
-
     public ResponseEntity<?> getHistory(
-
             @PathVariable Long doctorId,
-
-            @RequestParam(required = false)
-            String from,
-
-            @RequestParam(required = false)
-            String to
-
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to
     ) {
-
-        // ===== FILTERED HISTORY =====
-
         if (from != null && to != null) {
+            try {
+                LocalDate startDate = LocalDate.parse(from);
+                LocalDate endDate = LocalDate.parse(to);
 
-            LocalDate startDate =
-                    LocalDate.parse(from);
-
-            LocalDate endDate =
-                    LocalDate.parse(to);
-
-            List<Attendance> filteredHistory =
-
-                    attendanceService
-                            .getAttendanceHistory(
-
-                                    doctorId,
-                                    startDate,
-                                    endDate
-
-                            );
-
-            return ResponseEntity.ok(
-                    filteredHistory
-            );
-
+                List<Attendance> filteredHistory = attendanceService.getAttendanceHistory(
+                        doctorId, startDate, endDate
+                );
+                return ResponseEntity.ok(filteredHistory);
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid date format. Expected YYYY-MM-DD"));
+            }
         }
 
-        // ===== FULL HISTORY =====
-
-        List<Attendance> fullHistory =
-
-                attendanceService
-                        .getFullHistory(
-                                doctorId
-                        );
-
-        return ResponseEntity.ok(
-                fullHistory
-        );
-
+        List<Attendance> fullHistory = attendanceService.getFullHistory(doctorId);
+        return ResponseEntity.ok(fullHistory);
     }
-
 }
