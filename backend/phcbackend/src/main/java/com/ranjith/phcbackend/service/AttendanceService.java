@@ -526,4 +526,67 @@ public class AttendanceService {
 
     }
 
+    // ===== AUTOMATED ABSENTEE ALERTS =====
+
+    public int runAutomatedAbsenteeCheck() {
+        List<Doctor> doctors = doctorRepository.findAll();
+        LocalDate today = LocalDate.now();
+        int newlyFlaggedAbsent = 0;
+
+        for (Doctor doctor : doctors) {
+            Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
+            if (existing.isEmpty()) {
+                Attendance attendance = new Attendance();
+                attendance.setDoctor(doctor);
+                attendance.setDate(today);
+                attendance.setStatus("ABSENT");
+                attendanceRepository.save(attendance);
+
+                logAudit(doctor, "AUTOMATED_ABSENTEE_CHECK", null, null, null, null,
+                         "AUTOMATED_ABSENTEE_ALERT", "Doctor failed to check-in by cut-off time");
+                newlyFlaggedAbsent++;
+            }
+        }
+        return newlyFlaggedAbsent;
+    }
+
+    public List<java.util.Map<String, Object>> getAbsenteeAlerts() {
+        List<Doctor> doctors = doctorRepository.findAll();
+        LocalDate today = LocalDate.now();
+        List<java.util.Map<String, Object>> alerts = new java.util.ArrayList<>();
+
+        for (Doctor doctor : doctors) {
+            Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
+            boolean isAbsent = existing.isEmpty() || "ABSENT".equals(existing.get().getStatus());
+
+            if (isAbsent) {
+                java.util.Map<String, Object> alert = new java.util.HashMap<>();
+                alert.put("doctorId", doctor.getId());
+                alert.put("doctorName", doctor.getName());
+                alert.put("doctorEmail", doctor.getEmail());
+                alert.put("phcName", doctor.getPhc() != null ? doctor.getPhc().getName() : "Unassigned");
+                alert.put("date", today.toString());
+                alert.put("status", existing.isPresent() ? existing.get().getStatus() : "UNREPORTED");
+                alert.put("alertType", "AUTOMATED_ABSENTEE_ALERT");
+
+                // Attach last audit log for context if available
+                List<AttendanceAuditLog> auditLogs = auditLogRepository.findByDoctorOrderByTimestampDesc(doctor);
+                if (auditLogs != null && !auditLogs.isEmpty()) {
+                    AttendanceAuditLog lastLog = auditLogs.get(0);
+                    alert.put("lastAuditResult", lastLog.getVerificationResult());
+                    alert.put("lastAuditRemarks", lastLog.getRemarks());
+                    alert.put("lastAttemptTime", lastLog.getTimestamp().toString());
+                } else {
+                    alert.put("lastAuditResult", "NO_ATTEMPT");
+                    alert.put("lastAuditRemarks", "No check-in attempt recorded today");
+                    alert.put("lastAttemptTime", null);
+                }
+
+                alerts.add(alert);
+            }
+        }
+
+        return alerts;
+    }
+
 }

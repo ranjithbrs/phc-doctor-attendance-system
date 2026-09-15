@@ -187,4 +187,20 @@ public class AttendanceController {
         Map<String, Object> result = attendanceService.presencePing(doctorId, latitude, longitude, accuracy);
         return ResponseEntity.ok(result);
     }
+
+    // ===== AUTOMATED ABSENTEE ALERTS =====
+
+    @GetMapping("/absentee-alerts")
+    public ResponseEntity<?> getAbsenteeAlerts() {
+        return ResponseEntity.ok(attendanceService.getAbsenteeAlerts());
+    }
+
+    @PostMapping("/trigger-absentee-check")
+    public ResponseEntity<?> triggerAbsenteeCheck() {
+        int newlyFlagged = attendanceService.runAutomatedAbsenteeCheck();
+        return ResponseEntity.ok(Map.of(
+            "message", "Automated absentee check completed successfully",
+            "newlyFlaggedAbsentCount", newlyFlagged
+        ));
+    }
 }

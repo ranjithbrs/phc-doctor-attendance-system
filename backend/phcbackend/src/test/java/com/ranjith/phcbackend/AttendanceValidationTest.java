@@ -115,4 +115,19 @@ class AttendanceValidationTest {
         String result = attendanceService.checkIn(1L, 11.0168, 76.9558, 10.0);
         assertTrue(result.contains("Impossible travel speed detected") || result.contains("Location integrity alert"));
     }
+
+    @Test
+    void testAutomatedAbsenteeAlerts() {
+        Mockito.when(doctorRepository.findAll()).thenReturn(List.of(sampleDoctor));
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now())).thenReturn(Optional.empty());
+
+        int newlyFlagged = attendanceService.runAutomatedAbsenteeCheck();
+        assertEquals(1, newlyFlagged);
+        verify(attendanceRepository).save(any(Attendance.class));
+        verify(auditLogRepository).save(any(AttendanceAuditLog.class));
+
+        List<Map<String, Object>> alerts = attendanceService.getAbsenteeAlerts();
+        assertFalse(alerts.isEmpty());
+        assertEquals("AUTOMATED_ABSENTEE_ALERT", alerts.get(0).get("alertType"));
+    }
 }
