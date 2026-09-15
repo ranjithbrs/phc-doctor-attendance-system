@@ -13,30 +13,28 @@ import com.ranjith.phcbackend.model.PHC;
 import com.ranjith.phcbackend.repository.AttendanceRepository;
 import com.ranjith.phcbackend.repository.DoctorRepository;
 
+import java.time.LocalDateTime;
+import com.ranjith.phcbackend.model.AttendanceAuditLog;
+import com.ranjith.phcbackend.repository.AttendanceAuditLogRepository;
+
 @Service
 public class AttendanceService {
 
     private final AttendanceRepository attendanceRepository;
-
     private final DoctorRepository doctorRepository;
+    private final AttendanceAuditLogRepository auditLogRepository;
 
     public AttendanceService(
-
             AttendanceRepository attendanceRepository,
-
-            DoctorRepository doctorRepository
-
+            DoctorRepository doctorRepository,
+            AttendanceAuditLogRepository auditLogRepository
     ) {
-
-        this.attendanceRepository =
-                attendanceRepository;
-
-        this.doctorRepository =
-                doctorRepository;
-
+        this.attendanceRepository = attendanceRepository;
+        this.doctorRepository = doctorRepository;
+        this.auditLogRepository = auditLogRepository;
     }
 
-    // ===== CHECK-IN WITH SECURE GEO-FENCING & GPS VALIDATION =====
+    // ===== CHECK-IN WITH SECURE GEO-FENCING & GPS VALIDATION & AUDIT LOGGING =====
 
     public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy) {
 
@@ -54,15 +52,18 @@ public class AttendanceService {
 
         // Validate coordinate existence
         if (userLat == null || userLng == null) {
+            logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, null, "REJECTED_INVALID_COORDINATES", "Missing GPS latitude or longitude");
             return "GPS location coordinates (latitude and longitude) are required for check-in.";
         }
 
         // Validate numeric validity & bounds (-90 to +90 for lat, -180 to +180 for lng)
         if (Double.isNaN(userLat) || Double.isInfinite(userLat) || userLat < -90.0 || userLat > 90.0) {
+            logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, null, "REJECTED_INVALID_COORDINATES", "Latitude out of bounds [-90, +90]");
             return "Invalid latitude value. Must be between -90 and +90 degrees.";
         }
 
         if (Double.isNaN(userLng) || Double.isInfinite(userLng) || userLng < -180.0 || userLng > 180.0) {
+            logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, null, "REJECTED_INVALID_COORDINATES", "Longitude out of bounds [-180, +180]");
             return "Invalid longitude value. Must be between -180 and +180 degrees.";
         }
 
@@ -70,9 +71,11 @@ public class AttendanceService {
         final double MAX_ALLOWED_ACCURACY_METERS = 200.0;
         if (accuracy != null) {
             if (Double.isNaN(accuracy) || Double.isInfinite(accuracy) || accuracy < 0) {
+                logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, null, "REJECTED_POOR_ACCURACY", "Malformed GPS accuracy value");
                 return "Invalid GPS accuracy value.";
             }
             if (accuracy > MAX_ALLOWED_ACCURACY_METERS) {
+                logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, null, "REJECTED_POOR_ACCURACY", String.format("GPS uncertainty ±%.0fm exceeds max allowed %.0fm", accuracy, MAX_ALLOWED_ACCURACY_METERS));
                 return String.format("GPS accuracy is insufficient (±%.0fm). Maximum allowed uncertainty is %.0fm. Please move to an open area with better reception.", accuracy, MAX_ALLOWED_ACCURACY_METERS);
             }
         }
@@ -80,6 +83,7 @@ public class AttendanceService {
         // Validate assigned PHC coordinates
         PHC phc = doctor.getPhc();
         if (phc == null || phc.getLatitude() == null || phc.getLongitude() == null) {
+            logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, null, "REJECTED_MISSING_PHC_COORDS", "Assigned PHC coordinates missing in DB");
             return "Assigned Primary Health Centre (PHC) coordinates are not configured in the database.";
         }
 
@@ -102,6 +106,7 @@ public class AttendanceService {
         if (distanceMeters > MAX_ALLOWED_DISTANCE_METERS) {
             attendance.setStatus("ABSENT");
             attendanceRepository.save(attendance);
+            logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "REJECTED_OUTSIDE_RADIUS", String.format("%.0fm away from %s (Max: %.0fm)", distanceMeters, phc.getName(), MAX_ALLOWED_DISTANCE_METERS));
             return String.format("Outside PHC location (%.0fm away from %s). Maximum allowed distance is %.0fm. Attendance marked as ABSENT.", distanceMeters, phc.getName(), MAX_ALLOWED_DISTANCE_METERS);
         }
 
@@ -109,7 +114,27 @@ public class AttendanceService {
         attendance.setStatus("PRESENT");
         attendanceRepository.save(attendance);
 
+        logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "VERIFIED_SUCCESS", String.format("Verified inside %s boundary (%.0fm away)", phc.getName(), distanceMeters));
         return String.format("Check-in successful! Verified distance to %s: %.0fm.", phc.getName(), distanceMeters);
+    }
+
+    private void logAudit(Doctor doctor, String action, Double lat, Double lng, Double accuracy, Double dist, String result, String remarks) {
+        try {
+            AttendanceAuditLog log = new AttendanceAuditLog(LocalDateTime.now(), action, lat, lng, accuracy, dist, result, remarks, doctor);
+            auditLogRepository.save(log);
+        } catch (Exception e) {
+            // Log audit failure silently to prevent blocking check-in workflow
+            System.err.println("Failed to persist location audit log: " + e.getMessage());
+        }
+    }
+
+    public List<AttendanceAuditLog> getAuditLogsForDoctor(Long doctorId) {
+        Optional<Doctor> doc = doctorRepository.findById(doctorId);
+        return doc.map(auditLogRepository::findByDoctorOrderByTimestampDesc).orElse(List.of());
+    }
+
+    public List<AttendanceAuditLog> getRecentAuditLogs() {
+        return auditLogRepository.findTop50ByOrderByTimestampDesc();
     }
 
     public String checkIn(Long doctorId, Double userLat, Double userLng) {

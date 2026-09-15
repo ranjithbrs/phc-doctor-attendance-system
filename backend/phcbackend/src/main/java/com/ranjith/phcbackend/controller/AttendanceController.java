@@ -152,4 +152,16 @@ public class AttendanceController {
         List<Attendance> fullHistory = attendanceService.getFullHistory(doctorId);
         return ResponseEntity.ok(fullHistory);
     }
+
+    // ===== LOCATION AUDIT LOGS =====
+
+    @GetMapping("/audit/{doctorId}")
+    public ResponseEntity<?> getAuditLogs(@PathVariable Long doctorId) {
+        return ResponseEntity.ok(attendanceService.getAuditLogsForDoctor(doctorId));
+    }
+
+    @GetMapping("/audit/recent")
+    public ResponseEntity<?> getRecentAuditLogs() {
+        return ResponseEntity.ok(attendanceService.getRecentAuditLogs());
+    }
 }

@@ -49,7 +49,7 @@
   </div>
 
   <!-- PHC Table -->
-  <div class="table-wrapper">
+  <div class="table-wrapper mb-4">
     <div class="table-header">📋 PHC Attendance Overview</div>
     <div style="overflow-x:auto;">
       <table class="data-table">
@@ -64,6 +64,29 @@
         </thead>
         <tbody id="phcTable">
           <tr><td colspan="5" class="text-muted" style="padding:30px;">Loading data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Location Verification Audit Trail Table -->
+  <div class="table-wrapper">
+    <div class="table-header">🔍 Location Verification Audit Trail (Recent Fixes)</div>
+    <div style="overflow-x:auto;">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Doctor</th>
+            <th>Coordinates</th>
+            <th>Accuracy</th>
+            <th>Distance</th>
+            <th>Audit Determination</th>
+            <th>Remarks</th>
+          </tr>
+        </thead>
+        <tbody id="auditTable">
+          <tr><td colspan="7" class="text-muted" style="padding:30px;">Loading location audit logs...</td></tr>
         </tbody>
       </table>
     </div>
@@ -121,6 +144,45 @@ fetch(`${API_BASE_URL}/dashboard/phc-overview/${divisionId}`)
   })
   .catch(() => {
     table.innerHTML = "<tr><td colspan='5' class='text-danger' style='padding:24px;'>Error loading data</td></tr>";
+  });
+
+// Load Location Audit Logs
+const auditTable = document.getElementById("auditTable");
+
+fetch(`${API_BASE_URL}/attendance/audit/recent`)
+  .then(res => res.json())
+  .then(logs => {
+    auditTable.innerHTML = "";
+    if (!logs || logs.length === 0) {
+      auditTable.innerHTML = `<tr><td colspan="7" class="text-muted" style="padding:24px;">No audit evidence logs recorded yet.</td></tr>`;
+      return;
+    }
+    logs.forEach(log => {
+      let resultBadge = "badge-danger";
+      if (log.verificationResult === "VERIFIED_SUCCESS") resultBadge = "badge-success";
+      else if (log.verificationResult === "REJECTED_POOR_ACCURACY") resultBadge = "badge-warning";
+
+      const formattedTime = new Date(log.timestamp).toLocaleString();
+      const coords = (log.latitude && log.longitude) ? `${log.latitude.toFixed(4)}, ${log.longitude.toFixed(4)}` : "N/A";
+      const accuracyStr = log.accuracy ? `±${Math.round(log.accuracy)}m` : "N/A";
+      const distStr = log.calculatedDistanceMeters !== null && log.calculatedDistanceMeters !== undefined ? `${Math.round(log.calculatedDistanceMeters)}m` : "N/A";
+      const doctorName = log.doctor ? log.doctor.name : "Unknown";
+
+      auditTable.innerHTML += `
+        <tr>
+          <td style="font-size:13px;">${formattedTime}</td>
+          <td style="font-weight:600;">${doctorName}</td>
+          <td style="font-family:monospace;font-size:12px;">${coords}</td>
+          <td>${accuracyStr}</td>
+          <td>${distStr}</td>
+          <td><span class="badge ${resultBadge}">${log.verificationResult}</span></td>
+          <td style="font-size:13px;text-align:left;">${log.remarks || "-"}</td>
+        </tr>
+      `;
+    });
+  })
+  .catch(() => {
+    auditTable.innerHTML = `<tr><td colspan="7" class="text-muted" style="padding:24px;">Audit trail unavailable</td></tr>`;
   });
 
 </script>
