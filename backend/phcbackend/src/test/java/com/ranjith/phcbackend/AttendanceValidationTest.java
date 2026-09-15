@@ -130,4 +130,23 @@ class AttendanceValidationTest {
         assertFalse(alerts.isEmpty());
         assertEquals("AUTOMATED_ABSENTEE_ALERT", alerts.get(0).get("alertType"));
     }
+
+    @Test
+    void testConfigurablePhcGeoFence() {
+        // PHC with custom 1000m radius (e.g., Rural/Hilly PHC)
+        PHC customPhc = new PHC("Rural Hilly PHC", "Ooty", "PHC", 11.4102, 76.6950, 1000.0, null);
+        Doctor customDoc = new Doctor("Dr. Shanmugam", "shan@phc.gov.in", "pass", "General", "DOCTOR", customPhc);
+
+        Mockito.when(doctorRepository.findById(2L)).thenReturn(Optional.of(customDoc));
+
+        // Attempt check-in at 700m away (lat 11.4160, lng 76.6950 is ~640m away)
+        String result = attendanceService.checkIn(2L, 11.4160, 76.6950, 10.0);
+        assertTrue(result.startsWith("Check-in successful!"));
+
+        // PHC with narrow 200m radius (e.g. Dense Urban PHC)
+        customPhc.setRadiusMeters(200.0);
+        // Reset attendance check for clean test
+        String failResult = attendanceService.checkIn(2L, 11.4160, 76.6950, 10.0);
+        assertTrue(failResult.contains("Outside PHC location") && failResult.contains("Maximum allowed distance is 200m"));
+    }
 }

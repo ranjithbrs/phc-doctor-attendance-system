@@ -107,13 +107,13 @@ public class AttendanceService {
 
         // Calculate distance using Haversine formula
         double distanceMeters = calculateDistanceInMeters(userLat, userLng, phc.getLatitude(), phc.getLongitude());
-        final double MAX_ALLOWED_DISTANCE_METERS = 500.0; // 500 meters geo-fence radius
+        double maxAllowedDistance = phc.getRadiusMeters() != null ? phc.getRadiusMeters() : 500.0;
 
-        if (distanceMeters > MAX_ALLOWED_DISTANCE_METERS) {
+        if (distanceMeters > maxAllowedDistance) {
             attendance.setStatus("ABSENT");
             attendanceRepository.save(attendance);
-            logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "REJECTED_OUTSIDE_RADIUS", String.format("%.0fm away from %s (Max: %.0fm)", distanceMeters, phc.getName(), MAX_ALLOWED_DISTANCE_METERS));
-            return String.format("Outside PHC location (%.0fm away from %s). Maximum allowed distance is %.0fm. Attendance marked as ABSENT.", distanceMeters, phc.getName(), MAX_ALLOWED_DISTANCE_METERS);
+            logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "REJECTED_OUTSIDE_RADIUS", String.format("%.0fm away from %s (Max: %.0fm)", distanceMeters, phc.getName(), maxAllowedDistance));
+            return String.format("Outside PHC location (%.0fm away from %s). Maximum allowed distance is %.0fm. Attendance marked as ABSENT.", distanceMeters, phc.getName(), maxAllowedDistance);
         }
 
         attendance.setCheckInTime(LocalTime.now());
@@ -243,12 +243,12 @@ public class AttendanceService {
         }
 
         double distanceMeters = calculateDistanceInMeters(userLat, userLng, phc.getLatitude(), phc.getLongitude());
-        final double MAX_ALLOWED = 500.0;
+        double maxAllowedDistance = phc.getRadiusMeters() != null ? phc.getRadiusMeters() : 500.0;
 
         LocalTime now = LocalTime.now();
         attendance.setLastPresencePingTime(now);
 
-        if (distanceMeters > MAX_ALLOWED) {
+        if (distanceMeters > maxAllowedDistance) {
             int breaches = attendance.getPresenceBreachCount() + 1;
             attendance.setPresenceBreachCount(breaches);
             attendanceRepository.save(attendance);

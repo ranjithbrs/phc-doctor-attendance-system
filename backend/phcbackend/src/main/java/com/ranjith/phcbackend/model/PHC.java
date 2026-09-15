@@ -26,6 +26,8 @@ public class PHC {
 
     private Double longitude;
 
+    private Double radiusMeters = 500.0; // Geo-fence radius in meters (default: 500m)
+
     @ManyToOne
     @JoinColumn(name = "division_id", nullable = false)
     private Division division;
@@ -41,6 +43,18 @@ public class PHC {
         this.type = type;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.division = division;
+        this.radiusMeters = 500.0;
+    }
+
+    // Parameterized Constructor with radius
+    public PHC(String name, String location, String type, Double latitude, Double longitude, Double radiusMeters, Division division) {
+        this.name = name;
+        this.location = location;
+        this.type = type;
+        this.latitude = latitude;
+        this.longitude = longitude;
+        this.radiusMeters = radiusMeters != null ? radiusMeters : 500.0;
         this.division = division;
     }
 
@@ -70,6 +84,10 @@ public class PHC {
         return longitude;
     }
 
+    public Double getRadiusMeters() {
+        return radiusMeters != null ? radiusMeters : 500.0;
+    }
+
     public Division getDivision() {
         return division;
     }
@@ -92,6 +110,10 @@ public class PHC {
 
     public void setLongitude(Double longitude) {
         this.longitude = longitude;
+    }
+
+    public void setRadiusMeters(Double radiusMeters) {
+        this.radiusMeters = radiusMeters;
     }
 
     public void setDivision(Division division) {
