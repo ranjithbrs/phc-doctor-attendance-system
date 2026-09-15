@@ -123,6 +123,7 @@ document.getElementById("registerForm").addEventListener("submit", async functio
     localStorage.setItem("doctorId",   data.doctorId);
     localStorage.setItem("doctorName", data.name);
     localStorage.setItem("role",       data.role);
+    if (data.token) localStorage.setItem("authToken", data.token);
 
     successMsg.textContent = "Registration successful! Redirecting...";
     successMsg.classList.add("show");
