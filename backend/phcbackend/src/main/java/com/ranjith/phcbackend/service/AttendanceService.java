@@ -80,6 +80,12 @@ public class AttendanceService {
             }
         }
 
+        // Anti-spoofing: Evaluate location integrity (impossible speed / teleportation detection)
+        String integrityWarning = evaluateLocationIntegrity(doctor, userLat, userLng, accuracy);
+        if (integrityWarning != null) {
+            return integrityWarning;
+        }
+
         // Validate assigned PHC coordinates
         PHC phc = doctor.getPhc();
         if (phc == null || phc.getLatitude() == null || phc.getLongitude() == null) {
@@ -126,6 +132,52 @@ public class AttendanceService {
             // Log audit failure silently to prevent blocking check-in workflow
             System.err.println("Failed to persist location audit log: " + e.getMessage());
         }
+    }
+
+    // ===== ANTI-SPOOFING & LOCATION INTEGRITY HEURISTICS =====
+
+    private String evaluateLocationIntegrity(Doctor doctor, Double currentLat, Double currentLng, Double accuracy) {
+        try {
+            List<AttendanceAuditLog> recentLogs = auditLogRepository.findByDoctorOrderByTimestampDesc(doctor);
+            if (recentLogs == null || recentLogs.isEmpty()) {
+                return null;
+            }
+
+            AttendanceAuditLog prevLog = null;
+            for (AttendanceAuditLog l : recentLogs) {
+                if (l.getLatitude() != null && l.getLongitude() != null) {
+                    prevLog = l;
+                    break;
+                }
+            }
+
+            if (prevLog == null) {
+                return null;
+            }
+
+            long timeDiffSeconds = java.time.Duration.between(prevLog.getTimestamp(), LocalDateTime.now()).getSeconds();
+            if (timeDiffSeconds <= 0) {
+                timeDiffSeconds = 1;
+            }
+
+            if (timeDiffSeconds <= 14400) { // Check within 4-hour window
+                double distanceMeters = calculateDistanceInMeters(prevLog.getLatitude(), prevLog.getLongitude(), currentLat, currentLng);
+                double speedMetersPerSec = distanceMeters / timeDiffSeconds;
+                double speedKmPerHour = speedMetersPerSec * 3.6;
+
+                final double MAX_HUMAN_SPEED_KMH = 250.0; // Max allowed ground speed (250 km/h)
+
+                if (distanceMeters > 500 && speedKmPerHour > MAX_HUMAN_SPEED_KMH) {
+                    logAudit(doctor, "LOCATION_INTEGRITY_CHECK", currentLat, currentLng, accuracy, distanceMeters,
+                             "FLAGGED_IMPOSSIBLE_SPEED",
+                             String.format("Impossible travel speed detected: %.0f km/h (%.0fm in %ds)", speedKmPerHour, distanceMeters, timeDiffSeconds));
+                    return String.format("Location integrity alert: Impossible travel speed detected (%.0f km/h). Check-in rejected due to suspected GPS manipulation.", speedKmPerHour);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Location integrity evaluation error: " + e.getMessage());
+        }
+        return null;
     }
 
     public List<AttendanceAuditLog> getAuditLogsForDoctor(Long doctorId) {

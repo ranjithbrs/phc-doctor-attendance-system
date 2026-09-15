@@ -5,7 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -99,8 +101,18 @@ class AttendanceValidationTest {
         Attendance presentAttendance = new Attendance(LocalDate.now(), LocalTime.now(), null, "PRESENT", sampleDoctor);
         Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now())).thenReturn(Optional.of(presentAttendance));
 
-        // Ping location in Chennai (far from Coimbatore PHC)
         Map<String, Object> response = attendanceService.presencePing(1L, 13.0827, 80.2707, 15.0);
         assertEquals("BREACH_WARNING", response.get("status"));
+    }
+
+    @Test
+    void testAntiSpoofingImpossibleSpeed() {
+        // Previous log in Chennai 2 minutes ago
+        AttendanceAuditLog prevLog = new AttendanceAuditLog(LocalDateTime.now().minusMinutes(2), "CHECK_IN_ATTEMPT", 13.0827, 80.2707, 10.0, 500000.0, "VERIFIED_SUCCESS", "Initial fix", sampleDoctor);
+        Mockito.when(auditLogRepository.findByDoctorOrderByTimestampDesc(sampleDoctor)).thenReturn(List.of(prevLog));
+
+        // Current attempt in Coimbatore (500 km away within 2 mins -> ~15,000 km/h)
+        String result = attendanceService.checkIn(1L, 11.0168, 76.9558, 10.0);
+        assertTrue(result.contains("Impossible travel speed detected") || result.contains("Location integrity alert"));
     }
 }
