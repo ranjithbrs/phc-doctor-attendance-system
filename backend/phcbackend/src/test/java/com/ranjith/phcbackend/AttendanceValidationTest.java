@@ -157,4 +157,22 @@ class AttendanceValidationTest {
         assertTrue(result.contains("Marked LATE"));
         assertTrue(result.contains("09:15"));
     }
+
+    @Test
+    void testOfflineSynchronizationBatch() {
+        Map<String, Object> offlineCheckIn = Map.of(
+            "offlineId", "off_101",
+            "eventType", "CHECK_IN",
+            "latitude", 11.0168,
+            "longitude", 76.9558,
+            "accuracy", 10.0,
+            "timestamp", "09:05:00"
+        );
+
+        List<Map<String, Object>> syncResults = attendanceService.syncOfflineRecords(1L, List.of(offlineCheckIn));
+        assertFalse(syncResults.isEmpty());
+        assertEquals("off_101", syncResults.get(0).get("offlineId"));
+        assertEquals("SUCCESS", syncResults.get(0).get("status"));
+        verify(attendanceRepository).save(any(Attendance.class));
+    }
 }

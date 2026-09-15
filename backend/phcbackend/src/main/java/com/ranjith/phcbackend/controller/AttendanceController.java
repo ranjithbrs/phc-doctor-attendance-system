@@ -203,4 +203,33 @@ public class AttendanceController {
             "newlyFlaggedAbsentCount", newlyFlagged
         ));
     }
+
+    // ===== OFFLINE BATCH SYNCHRONIZATION =====
+
+    @PostMapping("/sync-offline")
+    public ResponseEntity<?> syncOffline(@RequestBody Map<String, Object> request) {
+        if (request == null || request.get("doctorId") == null || request.get("records") == null) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Doctor ID and records list are required"));
+        }
+
+        Long doctorId;
+        try {
+            doctorId = Long.valueOf(request.get("doctorId").toString());
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid Doctor ID format"));
+        }
+
+        List<Map<String, Object>> records;
+        try {
+            records = (List<Map<String, Object>>) request.get("records");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Invalid records format. Expected JSON array of objects."));
+        }
+
+        List<Map<String, Object>> results = attendanceService.syncOfflineRecords(doctorId, records);
+        return ResponseEntity.ok(Map.of(
+            "message", "Offline synchronization batch completed",
+            "syncedRecords", results
+        ));
+    }
 }

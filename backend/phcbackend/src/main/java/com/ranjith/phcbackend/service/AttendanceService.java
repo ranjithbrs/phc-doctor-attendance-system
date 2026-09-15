@@ -671,4 +671,70 @@ public class AttendanceService {
         return alerts;
     }
 
+    // ===== OFFLINE SYNCHRONIZATION =====
+
+    public List<java.util.Map<String, Object>> syncOfflineRecords(Long doctorId, List<java.util.Map<String, Object>> records) {
+        List<java.util.Map<String, Object>> results = new java.util.ArrayList<>();
+        if (doctorId == null || records == null || records.isEmpty()) {
+            return results;
+        }
+
+        Optional<Doctor> doctorOpt = doctorRepository.findById(doctorId);
+        if (doctorOpt.isEmpty()) {
+            return results;
+        }
+
+        Doctor doctor = doctorOpt.get();
+
+        for (java.util.Map<String, Object> rec : records) {
+            java.util.Map<String, Object> res = new java.util.HashMap<>();
+            Object offlineId = rec.get("offlineId");
+            res.put("offlineId", offlineId != null ? offlineId.toString() : "N/A");
+
+            String eventType = rec.get("eventType") != null ? rec.get("eventType").toString() : "CHECK_IN";
+            Double lat = rec.get("latitude") != null ? Double.valueOf(rec.get("latitude").toString()) : null;
+            Double lng = rec.get("longitude") != null ? Double.valueOf(rec.get("longitude").toString()) : null;
+            Double accuracy = rec.get("accuracy") != null ? Double.valueOf(rec.get("accuracy").toString()) : null;
+
+            LocalTime eventTime = LocalTime.now();
+            if (rec.get("timestamp") != null) {
+                try {
+                    String ts = rec.get("timestamp").toString();
+                    if (ts.contains("T")) {
+                        eventTime = java.time.LocalDateTime.parse(ts).toLocalTime();
+                    } else {
+                        eventTime = LocalTime.parse(ts);
+                    }
+                } catch (Exception e) {
+                    // Fallback to current time if parsing fails
+                }
+            }
+
+            if ("CHECK_IN".equalsIgnoreCase(eventType)) {
+                String checkInRes = checkIn(doctorId, lat, lng, accuracy, eventTime, LocalTime.of(9, 0), 15);
+                if (checkInRes != null && checkInRes.startsWith("Check-in successful")) {
+                    logAudit(doctor, "OFFLINE_SYNC_CHECK_IN", lat, lng, accuracy, null, "OFFLINE_SYNC_SUCCESS", "Offline check-in synced successfully");
+                    res.put("status", "SUCCESS");
+                    res.put("message", checkInRes);
+                } else {
+                    logAudit(doctor, "OFFLINE_SYNC_CHECK_IN", lat, lng, accuracy, null, "OFFLINE_SYNC_REJECTED", checkInRes);
+                    res.put("status", "REJECTED");
+                    res.put("message", checkInRes);
+                }
+            } else if ("PRESENCE_PING".equalsIgnoreCase(eventType)) {
+                java.util.Map<String, Object> pingRes = presencePing(doctorId, lat, lng, accuracy);
+                logAudit(doctor, "OFFLINE_SYNC_PING", lat, lng, accuracy, null, "OFFLINE_SYNC_PING", "Offline presence ping synced");
+                res.put("status", pingRes.get("status"));
+                res.put("message", pingRes.get("message"));
+            } else {
+                res.put("status", "UNKNOWN_EVENT");
+                res.put("message", "Unsupported event type: " + eventType);
+            }
+
+            results.add(res);
+        }
+
+        return results;
+    }
+
 }
