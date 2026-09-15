@@ -96,7 +96,7 @@ public class AttendanceService {
         Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
         if (existing.isPresent()) {
             Attendance attendance = existing.get();
-            if ("PRESENT".equals(attendance.getStatus()) || "COMPLETED".equals(attendance.getStatus())) {
+            if ("PRESENT".equals(attendance.getStatus()) || "LATE".equals(attendance.getStatus()) || "COMPLETED".equals(attendance.getStatus()) || "COMPLETED_EARLY".equals(attendance.getStatus())) {
                 return "Already checked in today";
             }
         }
@@ -116,11 +116,80 @@ public class AttendanceService {
             return String.format("Outside PHC location (%.0fm away from %s). Maximum allowed distance is %.0fm. Attendance marked as ABSENT.", distanceMeters, phc.getName(), maxAllowedDistance);
         }
 
-        attendance.setCheckInTime(LocalTime.now());
-        attendance.setStatus("PRESENT");
+        LocalTime checkTime = LocalTime.now();
+        LocalTime shiftTime = LocalTime.of(9, 0); // Default shift start: 09:00 AM
+        LocalTime graceCutoff = shiftTime.plusMinutes(15); // 15 mins grace period threshold
+
+        String computedStatus = checkTime.isAfter(graceCutoff) ? "LATE" : "PRESENT";
+
+        attendance.setCheckInTime(checkTime);
+        attendance.setStatus(computedStatus);
         attendanceRepository.save(attendance);
 
-        logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "VERIFIED_SUCCESS", String.format("Verified inside %s boundary (%.0fm away)", phc.getName(), distanceMeters));
+        String auditRemark = "LATE".equals(computedStatus)
+                ? String.format("Verified inside %s boundary (%.0fm away). Checked in late at %s (Grace Cutoff: %s)", phc.getName(), distanceMeters, checkTime, graceCutoff)
+                : String.format("Verified inside %s boundary (%.0fm away)", phc.getName(), distanceMeters);
+
+        logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "VERIFIED_SUCCESS", auditRemark);
+
+        if ("LATE".equals(computedStatus)) {
+            return String.format("Check-in successful! (Marked LATE - checked in at %s, grace cutoff was %s). Verified distance to %s: %.0fm.", checkTime, graceCutoff, phc.getName(), distanceMeters);
+        }
+        return String.format("Check-in successful! Verified distance to %s: %.0fm.", phc.getName(), distanceMeters);
+    }
+
+    // Overload for custom shift timing / test evaluation
+    public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy, LocalTime customCheckInTime, LocalTime shiftStartTime, Integer graceMinutes) {
+        if (doctorId == null) return "Invalid doctor ID";
+        Optional<Doctor> doctorOptional = doctorRepository.findById(doctorId);
+        if (doctorOptional.isEmpty()) return "Doctor not found";
+
+        Doctor doctor = doctorOptional.get();
+        LocalDate today = LocalDate.now();
+
+        PHC phc = doctor.getPhc();
+        if (phc == null || phc.getLatitude() == null || phc.getLongitude() == null) {
+            return "Assigned Primary Health Centre (PHC) coordinates are not configured in the database.";
+        }
+
+        Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
+        if (existing.isPresent()) {
+            Attendance attendance = existing.get();
+            if ("PRESENT".equals(attendance.getStatus()) || "LATE".equals(attendance.getStatus()) || "COMPLETED".equals(attendance.getStatus()) || "COMPLETED_EARLY".equals(attendance.getStatus())) {
+                return "Already checked in today";
+            }
+        }
+
+        Attendance attendance = existing.orElse(new Attendance());
+        attendance.setDoctor(doctor);
+        attendance.setDate(today);
+
+        double distanceMeters = calculateDistanceInMeters(userLat, userLng, phc.getLatitude(), phc.getLongitude());
+        double maxAllowedDistance = phc.getRadiusMeters() != null ? phc.getRadiusMeters() : 500.0;
+
+        if (distanceMeters > maxAllowedDistance) {
+            attendance.setStatus("ABSENT");
+            attendanceRepository.save(attendance);
+            return String.format("Outside PHC location (%.0fm away from %s). Maximum allowed distance is %.0fm. Attendance marked as ABSENT.", distanceMeters, phc.getName(), maxAllowedDistance);
+        }
+
+        LocalTime checkTime = customCheckInTime != null ? customCheckInTime : LocalTime.now();
+        LocalTime shiftTime = shiftStartTime != null ? shiftStartTime : LocalTime.of(9, 0);
+        int grace = graceMinutes != null ? graceMinutes : 15;
+        LocalTime graceCutoff = shiftTime.plusMinutes(grace);
+
+        String computedStatus = checkTime.isAfter(graceCutoff) ? "LATE" : "PRESENT";
+
+        attendance.setCheckInTime(checkTime);
+        attendance.setStatus(computedStatus);
+        attendanceRepository.save(attendance);
+
+        logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "VERIFIED_SUCCESS",
+                 String.format("Verified inside %s boundary (%.0fm away). Status: %s", phc.getName(), distanceMeters, computedStatus));
+
+        if ("LATE".equals(computedStatus)) {
+            return String.format("Check-in successful! (Marked LATE - checked in at %s, grace cutoff was %s). Verified distance to %s: %.0fm.", checkTime, graceCutoff, phc.getName(), distanceMeters);
+        }
         return String.format("Check-in successful! Verified distance to %s: %.0fm.", phc.getName(), distanceMeters);
     }
 
@@ -338,19 +407,32 @@ public class AttendanceService {
             return "Cannot check out: You were marked ABSENT for today due to being outside the PHC geo-fence.";
         }
 
-        if ("COMPLETED".equals(attendance.getStatus())) {
+        if ("COMPLETED".equals(attendance.getStatus()) || "COMPLETED_EARLY".equals(attendance.getStatus())) {
             return "Already checked out today";
         }
 
-        if (!"PRESENT".equals(attendance.getStatus())) {
+        if (!"PRESENT".equals(attendance.getStatus()) && !"LATE".equals(attendance.getStatus())) {
             return "No active check-in found for today";
         }
 
-        attendance.setCheckOutTime(LocalTime.now());
+        LocalTime now = LocalTime.now();
+        attendance.setCheckOutTime(now);
+
+        long workedMinutes = 0;
+        if (attendance.getCheckInTime() != null) {
+            workedMinutes = java.time.Duration.between(attendance.getCheckInTime(), now).toMinutes();
+        }
+
+        if (workedMinutes > 0 && workedMinutes < 240) { // Under 4 hours
+            attendance.setStatus("COMPLETED_EARLY");
+            attendanceRepository.save(attendance);
+            logAudit(doctor, "CHECK_OUT_ATTEMPT", null, null, null, null, "CHECK_OUT_SUCCESS", String.format("Checked out early after %d mins worked", workedMinutes));
+            return String.format("Check-out successful (Early Departure: %d mins worked)", workedMinutes);
+        }
+
         attendance.setStatus("COMPLETED");
-
         attendanceRepository.save(attendance);
-
+        logAudit(doctor, "CHECK_OUT_ATTEMPT", null, null, null, null, "CHECK_OUT_SUCCESS", String.format("Checked out after %d mins worked", workedMinutes));
         return "Check-out successful";
     }
 

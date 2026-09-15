@@ -149,4 +149,12 @@ class AttendanceValidationTest {
         String failResult = attendanceService.checkIn(2L, 11.4160, 76.6950, 10.0);
         assertTrue(failResult.contains("Outside PHC location") && failResult.contains("Maximum allowed distance is 200m"));
     }
+
+    @Test
+    void testAdvancedAttendanceRulesLateCheckIn() {
+        // Doctor checking in at 09:30 AM (Shift Start: 09:00 AM, Grace: 15 mins -> Cutoff: 09:15 AM)
+        String result = attendanceService.checkIn(1L, 11.0168, 76.9558, 10.0, LocalTime.of(9, 30), LocalTime.of(9, 0), 15);
+        assertTrue(result.contains("Marked LATE"));
+        assertTrue(result.contains("09:15"));
+    }
 }
