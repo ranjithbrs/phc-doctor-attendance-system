@@ -92,7 +92,7 @@ Test both role-based workflows using the following pre-seeded accounts:
 
 ## ✨ Key Upgrades & Security Features
 
-The application incorporates **9 major enterprise upgrades**:
+The application incorporates **14 major enterprise upgrades**:
 
 1. 🔍 **Location Verification Audit Trail**: Persists detailed audit evidence (`AttendanceAuditLog`) capturing timestamps, GPS coordinates, accuracy (m), calculated distance (m), verification results (`VERIFIED_SUCCESS`, `REJECTED_OUTSIDE_RADIUS`, `REJECTED_POOR_ACCURACY`), and remarks.
 2. 💓 **Continuous Presence Verification**: Automated background 5-minute heartbeat ping (`/attendance/presence-ping`) verifying medical officer presence throughout duty hours, tracking last ping timestamp and geo-fence breach counts.
@@ -103,6 +103,11 @@ The application incorporates **9 major enterprise upgrades**:
 7. ⏰ **Advanced Attendance Rules & Grace Periods**: Enforces shift start times (09:00 AM) and grace periods (15 mins cutoff -> 09:15 AM). Automatically classifies check-ins after 09:15 AM as `LATE` and tracks early departure (`COMPLETED_EARLY` for <4 hrs worked).
 8. 🔄 **Offline Batch Synchronization**: Dedicated offline batch sync API (`POST /attendance/sync-offline`) allowing doctors in low-connectivity areas to queue check-ins and pings locally and batch-upload them upon reconnection.
 9. 🧠 **Attendance Anomaly Detection Engine**: High-risk pattern scanner (`GET /attendance/anomalies`) identifying `SUSPECTED_GPS_SPOOFING`, `HIGH_PRESENCE_BREACHES` (≥3 breaches), and `FREQUENT_LATE_ARRIVALS`.
+10. 🔒 **Device Binding & Hardware Locking**: Binds doctor accounts to single registered devices (`registeredDeviceId`), blocking unauthorized logins from secondary devices.
+11. 📅 **Leave Management & Approval Workflow**: Formal leave application (`CASUAL_LEAVE`, `MEDICAL_LEAVE`), admin review flow, and automated absentee alert exemption (`ON_LEAVE` status).
+12. 📸 **Facial Liveness & Camera Verification**: Real-time webcam selfie capture and facial liveness threshold verification (`< 0.70` score rejection) with photo proof storage.
+13. 📡 **Real-Time Surveillance Notification Banners**: Live surveillance alert feed (`GET /attendance/surveillance-feed`) broadcasting presence breaches, spoofing attempts, and late check-ins to the DDHC admin dashboard with 10s auto-polling.
+14. 📲 **Progressive Web App (PWA) Support**: Service Worker (`sw.js`) offline asset caching, network-first API fallback, and installable web app manifest (`manifest.json`) for desktop/mobile installability.
 
 ---
 
