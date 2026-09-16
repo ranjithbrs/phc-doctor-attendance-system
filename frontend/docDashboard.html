@@ -57,15 +57,16 @@
 <script>
 
 // Session & role check
-if (localStorage.getItem("role") !== "DOCTOR") {
+const userRole = (getSafeStorage("role") || "").toUpperCase();
+if (userRole !== "DOCTOR" && userRole !== "ADMIN") {
   window.location.href = "index.html";
 }
 
-const doctorId   = localStorage.getItem("doctorId");
-const doctorName = localStorage.getItem("doctorName") || "Doctor";
+const doctorId   = getSafeStorage("doctorId");
+const doctorName = getSafeStorage("doctorName") || "Doctor";
 
 if (!doctorId || doctorId === "undefined" || doctorId === "null") {
-  localStorage.clear();
+  clearSafeStorage();
   window.location.href = "index.html";
 }
 

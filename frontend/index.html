@@ -91,21 +91,21 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
       return;
     }
 
-    localStorage.setItem("doctorId",   data.doctorId);
-    localStorage.setItem("doctorName", data.name);
-    localStorage.setItem("role",       data.role);
-    if (data.token) localStorage.setItem("authToken", data.token);
+    setSafeStorage("doctorId",   data.doctorId);
+    setSafeStorage("doctorName", data.name);
+    setSafeStorage("role",       (data.role || "DOCTOR").toUpperCase());
+    if (data.token) setSafeStorage("authToken", data.token);
 
     successMsg.textContent = "Login successful! Redirecting...";
     successMsg.classList.add("show");
 
     setTimeout(() => {
-      window.location.href = data.role === "ADMIN" ? "ddhcDashboard.html" : "docDashboard.html";
+      window.location.href = (data.role || "").toUpperCase() === "ADMIN" ? "ddhcDashboard.html" : "docDashboard.html";
     }, 800);
 
   } catch (error) {
     console.error(error);
-    errorMsg.textContent = "Unable to reach backend server (" + API_BASE_URL + "). If using Render Cloud, please wait ~20s for cold-start or click 'Use Local (8080)'.";
+    errorMsg.textContent = "Unable to reach backend server (" + API_BASE_URL + "). If using Render Cloud, please wait ~20s for cold-start.";
     errorMsg.classList.add("show");
     btn.innerHTML = "Sign In";
     btn.disabled = false;
@@ -115,7 +115,11 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 document.getElementById("connectedApiLabel").innerText = API_BASE_URL;
 
 function switchBackend(url) {
-  localStorage.setItem("API_BASE_URL", url);
+  if (window.location.protocol === "https:" && url.startsWith("http://")) {
+    alert("Browser Security Warning: HTTPS pages (like GitHub Pages) block HTTP requests to localhost due to Mixed Content security rules. To test local backend (8080), please open the app via local file:// or http://localhost.");
+    return;
+  }
+  setSafeStorage("API_BASE_URL", url);
   window.location.reload();
 }
 

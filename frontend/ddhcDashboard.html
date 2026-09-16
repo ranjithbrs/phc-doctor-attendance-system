@@ -112,7 +112,7 @@
 <script>
 
 // Role protection
-if (localStorage.getItem("role") !== "ADMIN") {
+if ((getSafeStorage("role") || "").toUpperCase() !== "ADMIN") {
   window.location.href = "index.html";
 }
 
