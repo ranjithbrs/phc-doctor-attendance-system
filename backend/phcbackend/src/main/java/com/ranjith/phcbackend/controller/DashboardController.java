@@ -33,4 +33,10 @@ public class DashboardController {
     public List<Map<String, Object>> getPhcOverview(@PathVariable Long divisionId) {
         return dashboardService.getPhcOverview(divisionId);
     }
+
+    // ✅ ANALYTICS (CHART.JS DATA)
+    @GetMapping("/analytics/{divisionId}")
+    public Map<String, Object> getAnalytics(@PathVariable Long divisionId) {
+        return dashboardService.getAnalytics(divisionId);
+    }
 }
