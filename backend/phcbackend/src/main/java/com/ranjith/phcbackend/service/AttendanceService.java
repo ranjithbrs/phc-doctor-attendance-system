@@ -229,6 +229,47 @@ public class AttendanceService {
         return auditLogRepository.findTop50ByOrderByTimestampDesc();
     }
 
+    // ===== REAL-TIME SURVEILLANCE FEED & NOTIFICATION BROADCAST =====
+
+    public List<java.util.Map<String, Object>> getSurveillanceFeed() {
+        List<AttendanceAuditLog> recentLogs = auditLogRepository.findTop50ByOrderByTimestampDesc();
+        List<java.util.Map<String, Object>> feed = new java.util.ArrayList<>();
+
+        if (recentLogs == null) return feed;
+
+        for (AttendanceAuditLog log : recentLogs) {
+            String res = log.getVerificationResult();
+            if (res == null) continue;
+
+            boolean isAlert = res.contains("BREACH") || res.contains("SPOOF") || res.contains("IMPOSSIBLE")
+                           || res.contains("REJECTED") || res.contains("FAIL") || res.contains("ALERT")
+                           || res.contains("LATE");
+
+            if (isAlert) {
+                java.util.Map<String, Object> item = new java.util.HashMap<>();
+                item.put("id", log.getId());
+                item.put("timestamp", log.getTimestamp() != null ? log.getTimestamp().toString() : "");
+                item.put("doctorName", log.getDoctor() != null ? log.getDoctor().getName() : "Unknown");
+                item.put("phcName", (log.getDoctor() != null && log.getDoctor().getPhc() != null) ? log.getDoctor().getPhc().getName() : "Unassigned");
+                item.put("action", log.getAction());
+                item.put("verificationResult", log.getVerificationResult());
+                item.put("remarks", log.getRemarks());
+
+                String severity = "INFO";
+                if (res.contains("SPOOF") || res.contains("IMPOSSIBLE")) {
+                    severity = "CRITICAL";
+                } else if (res.contains("BREACH") || res.contains("REJECTED") || res.contains("FAIL")) {
+                    severity = "WARNING";
+                } else if (res.contains("LATE")) {
+                    severity = "NOTICE";
+                }
+                item.put("severity", severity);
+                feed.add(item);
+            }
+        }
+        return feed;
+    }
+
     // ===== CONTINUOUS PRESENCE VERIFICATION (HEARTBEAT PING) =====
 
     public java.util.Map<String, Object> presencePing(Long doctorId, Double userLat, Double userLng, Double accuracy) {

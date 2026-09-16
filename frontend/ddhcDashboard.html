@@ -69,6 +69,17 @@
     </div>
   </div>
 
+  <!-- Real-Time Surveillance Notification Feed -->
+  <div class="table-wrapper mb-4">
+    <div class="table-header" style="display:flex; justify-content:space-between; align-items:center;">
+      <span>📡 Real-Time Surveillance &amp; Geofence Alert Feed</span>
+      <span class="badge badge-success" style="font-size:12px;" id="surveillanceLiveStatus">🔴 LIVE SURVEILLANCE ACTIVE</span>
+    </div>
+    <div id="surveillanceFeedContainer" style="padding:15px; display:flex; flex-direction:column; gap:10px; max-height:250px; overflow-y:auto;">
+      <div class="text-muted" style="padding:10px;">Listening for live surveillance events...</div>
+    </div>
+  </div>
+
   <!-- Location Verification Audit Trail Table -->
   <div class="table-wrapper">
     <div class="table-header">🔍 Location Verification Audit Trail (Recent Fixes)</div>
@@ -184,6 +195,46 @@ fetch(`${API_BASE_URL}/attendance/audit/recent`)
   .catch(() => {
     auditTable.innerHTML = `<tr><td colspan="7" class="text-muted" style="padding:24px;">Audit trail unavailable</td></tr>`;
   });
+
+// ===== REAL-TIME SURVEILLANCE FEED =====
+function loadSurveillanceFeed() {
+  fetch(`${API_BASE_URL}/attendance/surveillance-feed`)
+    .then(res => res.json())
+    .then(data => {
+      const container = document.getElementById("surveillanceFeedContainer");
+      if (!data || !data.feed || data.feed.length === 0) {
+        container.innerHTML = `<div class="text-muted" style="padding:10px;">No critical surveillance alerts detected today. All PHCs operating within normal parameters.</div>`;
+        return;
+      }
+      container.innerHTML = "";
+      data.feed.forEach(item => {
+        let alertBg = "#fef2f2";
+        let alertBorder = "#ef4444";
+        let icon = "⚠️";
+        if (item.severity === "CRITICAL") {
+          alertBg = "#fff1f2"; alertBorder = "#e11d48"; icon = "🚨";
+        } else if (item.severity === "WARNING") {
+          alertBg = "#fffbeb"; alertBorder = "#f59e0b"; icon = "⚠️";
+        } else if (item.severity === "NOTICE") {
+          alertBg = "#eff6ff"; alertBorder = "#3b82f6"; icon = "ℹ️";
+        }
+
+        const formattedTime = item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : "";
+        container.innerHTML += `
+          <div style="background:${alertBg}; border-left:4px solid ${alertBorder}; padding:10px 14px; border-radius:6px; font-size:13px; display:flex; align-items:center; justify-content:space-between;">
+            <div>
+              <strong>${icon} [${item.severity}] ${item.doctorName} (${item.phcName})</strong>: ${item.remarks || item.verificationResult}
+            </div>
+            <span style="font-size:12px; color:#6b7280; font-family:monospace;">${formattedTime}</span>
+          </div>
+        `;
+      });
+    })
+    .catch(() => {});
+}
+
+loadSurveillanceFeed();
+setInterval(loadSurveillanceFeed, 10000); // Refresh surveillance feed every 10s
 
 </script>
 </body>

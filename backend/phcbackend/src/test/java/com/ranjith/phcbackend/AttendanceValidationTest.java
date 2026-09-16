@@ -269,5 +269,24 @@ class AttendanceValidationTest {
         assertTrue(validScoreResult.startsWith("Check-in successful!"));
         verify(attendanceRepository).save(any(Attendance.class));
     }
+
+    @Test
+    void testSurveillanceNotificationFeed() {
+        AttendanceAuditLog breachLog = new AttendanceAuditLog(LocalDateTime.now(), "PRESENCE_PING", 13.0827, 80.2707, 10.0, 500.0, "PRESENCE_BREACH_WARNING", "Presence breach outside PHC", sampleDoctor);
+        AttendanceAuditLog spoofLog = new AttendanceAuditLog(LocalDateTime.now(), "CHECK_IN_ATTEMPT", 11.0168, 76.9558, 10.0, 50000.0, "FLAGGED_IMPOSSIBLE_SPEED", "Impossible travel speed detected", sampleDoctor);
+
+        Mockito.when(auditLogRepository.findTop50ByOrderByTimestampDesc()).thenReturn(List.of(breachLog, spoofLog));
+
+        List<Map<String, Object>> feed = attendanceService.getSurveillanceFeed();
+        assertNotNull(feed);
+        assertEquals(2, feed.size());
+
+        Map<String, Object> firstItem = feed.get(0);
+        assertEquals("WARNING", firstItem.get("severity"));
+        assertEquals("Dr. Arunkumar", firstItem.get("doctorName"));
+
+        Map<String, Object> secondItem = feed.get(1);
+        assertEquals("CRITICAL", secondItem.get("severity"));
+    }
 }
 

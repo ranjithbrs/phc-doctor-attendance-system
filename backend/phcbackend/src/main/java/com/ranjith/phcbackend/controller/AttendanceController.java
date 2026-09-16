@@ -254,4 +254,15 @@ public class AttendanceController {
             "anomalies", anomalies
         ));
     }
+
+    // ===== REAL-TIME SURVEILLANCE FEED =====
+
+    @GetMapping("/surveillance-feed")
+    public ResponseEntity<?> getSurveillanceFeed() {
+        List<Map<String, Object>> feed = attendanceService.getSurveillanceFeed();
+        return ResponseEntity.ok(Map.of(
+            "totalFeedItems", feed.size(),
+            "feed", feed
+        ));
+    }
 }
