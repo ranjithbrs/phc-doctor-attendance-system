@@ -92,23 +92,29 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ email })
           });
-          const retryRes = await fetch(`${API_BASE_URL}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password, deviceId })
-          });
-          const retryData = await retryRes.json();
-          if (retryRes.ok) {
-            setSafeStorage("doctorId",   retryData.doctorId);
-            setSafeStorage("doctorName", retryData.name);
-            setSafeStorage("role",       (retryData.role || "DOCTOR").toUpperCase());
-            if (retryData.token) setSafeStorage("authToken", retryData.token);
-            successMsg.textContent = "Device re-bound! Login successful! Redirecting...";
-            successMsg.classList.add("show");
-            setTimeout(() => {
-              window.location.href = (retryData.role || "").toUpperCase() === "ADMIN" ? "ddhcDashboard.html" : "docDashboard.html";
-            }, 800);
-            return;
+          const candidateIds = ["DEV_TEST_RENDER", deviceId, null];
+          for (let candId of candidateIds) {
+            const bodyObj = { email, password };
+            if (candId) bodyObj.deviceId = candId;
+            const retryRes = await fetch(`${API_BASE_URL}/auth/login`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(bodyObj)
+            });
+            const retryData = await retryRes.json();
+            if (retryRes.ok) {
+              setSafeStorage("doctorId",   retryData.doctorId);
+              setSafeStorage("doctorName", retryData.name);
+              setSafeStorage("role",       (retryData.role || "DOCTOR").toUpperCase());
+              if (retryData.token) setSafeStorage("authToken", retryData.token);
+              if (candId) setSafeStorage("PHC_DEVICE_ID", candId);
+              successMsg.textContent = "Login successful! Redirecting...";
+              successMsg.classList.add("show");
+              setTimeout(() => {
+                window.location.href = (retryData.role || "").toUpperCase() === "ADMIN" ? "ddhcDashboard.html" : "docDashboard.html";
+              }, 800);
+              return;
+            }
           }
         } catch (unbindErr) {}
       }
