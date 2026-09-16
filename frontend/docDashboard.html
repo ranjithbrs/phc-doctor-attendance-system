@@ -65,7 +65,6 @@ const doctorId   = localStorage.getItem("doctorId");
 const doctorName = localStorage.getItem("doctorName") || "Doctor";
 
 if (!doctorId || doctorId === "undefined" || doctorId === "null") {
-  alert("Session expired. Please login again.");
   localStorage.clear();
   window.location.href = "index.html";
 }
