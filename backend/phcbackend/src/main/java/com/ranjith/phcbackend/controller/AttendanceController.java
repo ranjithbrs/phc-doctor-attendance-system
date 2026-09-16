@@ -265,4 +265,15 @@ public class AttendanceController {
             "feed", feed
         ));
     }
+
+    // ===== AI COMPLIANCE SCORECARD =====
+
+    @GetMapping("/compliance-score/{doctorId}")
+    public ResponseEntity<?> getComplianceScore(@PathVariable Long doctorId) {
+        Map<String, Object> result = attendanceService.getComplianceScore(doctorId);
+        if (result.containsKey("error")) {
+            return ResponseEntity.badRequest().body(result);
+        }
+        return ResponseEntity.ok(result);
+    }
 }
