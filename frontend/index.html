@@ -69,8 +69,8 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
   btn.disabled = true;
 
   let deviceId = getSafeStorage("PHC_DEVICE_ID");
-  if (!deviceId) {
-    deviceId = "PHC_DEV_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+  if (!deviceId || API_BASE_URL.includes("onrender.com")) {
+    deviceId = "DEV_TEST_RENDER";
     setSafeStorage("PHC_DEVICE_ID", deviceId);
   }
 
