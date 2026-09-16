@@ -117,7 +117,7 @@ if ((getSafeStorage("role") || "").toUpperCase() !== "ADMIN") {
 }
 
 function logout() {
-  localStorage.clear();
+  clearSafeStorage();
   window.location.href = "index.html";
 }
 

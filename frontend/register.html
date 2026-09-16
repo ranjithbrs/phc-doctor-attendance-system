@@ -122,16 +122,16 @@ document.getElementById("registerForm").addEventListener("submit", async functio
       return;
     }
 
-    localStorage.setItem("doctorId",   data.doctorId);
-    localStorage.setItem("doctorName", data.name);
-    localStorage.setItem("role",       data.role);
-    if (data.token) localStorage.setItem("authToken", data.token);
+    setSafeStorage("doctorId",   data.doctorId);
+    setSafeStorage("doctorName", data.name);
+    setSafeStorage("role",       (data.role || "DOCTOR").toUpperCase());
+    if (data.token) setSafeStorage("authToken", data.token);
 
     successMsg.textContent = "Registration successful! Redirecting...";
     successMsg.classList.add("show");
 
     setTimeout(() => {
-      window.location.href = data.role === "ADMIN" ? "ddhcDashboard.html" : "docDashboard.html";
+      window.location.href = (data.role || "").toUpperCase() === "ADMIN" ? "ddhcDashboard.html" : "docDashboard.html";
     }, 1000);
 
   } catch (error) {

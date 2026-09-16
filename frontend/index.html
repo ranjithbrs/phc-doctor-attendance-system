@@ -68,10 +68,10 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
   btn.innerHTML = '<span class="spinner"></span> Signing in...';
   btn.disabled = true;
 
-  let deviceId = localStorage.getItem("PHC_DEVICE_ID");
+  let deviceId = getSafeStorage("PHC_DEVICE_ID");
   if (!deviceId) {
     deviceId = "PHC_DEV_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
-    localStorage.setItem("PHC_DEVICE_ID", deviceId);
+    setSafeStorage("PHC_DEVICE_ID", deviceId);
   }
 
   try {

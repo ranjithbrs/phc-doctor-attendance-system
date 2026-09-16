@@ -67,12 +67,11 @@
 <script src="config.js"></script>
 <script>
 
-const doctorId = localStorage.getItem("doctorId");
-const doctorName = localStorage.getItem("doctorName") || "Doctor";
+const doctorId   = getSafeStorage("doctorId");
+const doctorName = getSafeStorage("doctorName") || "Doctor";
 
 if (!doctorId || doctorId === "undefined" || doctorId === "null") {
-  alert("Session expired. Please login again.");
-  localStorage.clear();
+  clearSafeStorage();
   window.location.href = "index.html";
 }
 

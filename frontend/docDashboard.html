@@ -320,7 +320,7 @@ document.getElementById("checkOutBtn").addEventListener("click", () => {
   });
 });
 
-function logout()      { localStorage.clear(); window.location.href = "index.html"; }
+function logout()      { clearSafeStorage(); window.location.href = "index.html"; }
 function goToHistory() { window.location.href = "attendanceHistory.html"; }
 
 if ('serviceWorker' in navigator) {
