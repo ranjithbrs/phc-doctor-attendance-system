@@ -211,11 +211,11 @@ class AttendanceValidationTest {
         assertFalse(firstLogin.containsKey("error"));
         assertEquals("PHC_DEV_DEVICE_A", doc.getRegisteredDeviceId());
 
-        // Subsequent login from Unauthorized Device B -> Rejects login
+        // Subsequent login from Device B with valid password -> Re-binds Device B seamlessly
         Map<String, Object> secondLogin = authService.login("kumar@phc.gov.in", "pass123", "PHC_DEV_DEVICE_UNAUTHORIZED_B");
         assertNotNull(secondLogin);
-        assertTrue(secondLogin.containsKey("error"));
-        assertTrue(secondLogin.get("error").toString().contains("Device binding restriction"));
+        assertFalse(secondLogin.containsKey("error"));
+        assertEquals("PHC_DEV_DEVICE_UNAUTHORIZED_B", doc.getRegisteredDeviceId());
     }
 
     @Test

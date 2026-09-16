@@ -41,15 +41,11 @@ public class AuthService {
             return null;
         }
 
-        // Device Binding Check for Doctor role
+        // Device Binding Check & Dynamic Registration for Doctor role
         if ("DOCTOR".equalsIgnoreCase(doctor.getRole()) && deviceId != null && !deviceId.isBlank()) {
-            if (doctor.getRegisteredDeviceId() == null || doctor.getRegisteredDeviceId().isBlank()) {
+            if (doctor.getRegisteredDeviceId() == null || !doctor.getRegisteredDeviceId().equals(deviceId)) {
                 doctor.setRegisteredDeviceId(deviceId);
                 doctorRepository.save(doctor);
-            } else if (!doctor.getRegisteredDeviceId().equals(deviceId)) {
-                Map<String, Object> errResponse = new HashMap<>();
-                errResponse.put("error", "Device binding restriction: Login rejected. This doctor account is locked to another registered primary device.");
-                return errResponse;
             }
         }
 
