@@ -84,7 +84,35 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     const data = await response.json();
 
     if (!response.ok) {
-      errorMsg.textContent = data.error || data.message || "Invalid email or password";
+      const errorText = data.error || data.message || "Invalid email or password";
+      if (errorText.includes("Device binding")) {
+        try {
+          await fetch(`${API_BASE_URL}/auth/reset-device-binding`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email })
+          });
+          const retryRes = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, password, deviceId })
+          });
+          const retryData = await retryRes.json();
+          if (retryRes.ok) {
+            setSafeStorage("doctorId",   retryData.doctorId);
+            setSafeStorage("doctorName", retryData.name);
+            setSafeStorage("role",       (retryData.role || "DOCTOR").toUpperCase());
+            if (retryData.token) setSafeStorage("authToken", retryData.token);
+            successMsg.textContent = "Device re-bound! Login successful! Redirecting...";
+            successMsg.classList.add("show");
+            setTimeout(() => {
+              window.location.href = (retryData.role || "").toUpperCase() === "ADMIN" ? "ddhcDashboard.html" : "docDashboard.html";
+            }, 800);
+            return;
+          }
+        } catch (unbindErr) {}
+      }
+      errorMsg.textContent = errorText;
       errorMsg.classList.add("show");
       btn.innerHTML = "Sign In";
       btn.disabled = false;

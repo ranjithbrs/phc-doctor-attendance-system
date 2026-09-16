@@ -62,6 +62,20 @@ public class AuthService {
         return response;
     }
 
+    public Map<String, Object> resetDeviceBinding(String email) {
+        Map<String, Object> response = new HashMap<>();
+        Optional<Doctor> docOpt = doctorRepository.findByEmail(email);
+        if (docOpt.isPresent()) {
+            Doctor doc = docOpt.get();
+            doc.setRegisteredDeviceId(null);
+            doctorRepository.save(doc);
+            response.put("message", "Device binding reset successfully");
+        } else {
+            response.put("error", "Doctor account not found");
+        }
+        return response;
+    }
+
     public Map<String, Object> register(String name, String email, String password, String specialization, String role, Long phcId) {
         Map<String, Object> response = new HashMap<>();
 

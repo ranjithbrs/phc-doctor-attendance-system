@@ -55,6 +55,19 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/reset-device-binding")
+    public ResponseEntity<?> resetDeviceBinding(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        }
+        Map<String, Object> res = authService.resetDeviceBinding(email);
+        if (res.containsKey("error")) {
+            return ResponseEntity.badRequest().body(res);
+        }
+        return ResponseEntity.ok(res);
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody Map<String, Object> request) {
         String name = (String) request.get("name");
