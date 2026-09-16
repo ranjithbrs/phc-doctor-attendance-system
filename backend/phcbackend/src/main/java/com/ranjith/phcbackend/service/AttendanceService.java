@@ -23,6 +23,7 @@ public class AttendanceService {
     private final AttendanceRepository attendanceRepository;
     private final DoctorRepository doctorRepository;
     private final AttendanceAuditLogRepository auditLogRepository;
+    private LeaveService leaveService;
 
     public AttendanceService(
             AttendanceRepository attendanceRepository,
@@ -32,6 +33,11 @@ public class AttendanceService {
         this.attendanceRepository = attendanceRepository;
         this.doctorRepository = doctorRepository;
         this.auditLogRepository = auditLogRepository;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setLeaveService(LeaveService leaveService) {
+        this.leaveService = leaveService;
     }
 
     // ===== CHECK-IN WITH SECURE GEO-FENCING & GPS VALIDATION & AUDIT LOGGING =====
@@ -618,15 +624,22 @@ public class AttendanceService {
         for (Doctor doctor : doctors) {
             Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
             if (existing.isEmpty()) {
+                boolean onApprovedLeave = leaveService != null && leaveService.isDoctorOnApprovedLeave(doctor, today);
+
                 Attendance attendance = new Attendance();
                 attendance.setDoctor(doctor);
                 attendance.setDate(today);
-                attendance.setStatus("ABSENT");
+                attendance.setStatus(onApprovedLeave ? "ON_LEAVE" : "ABSENT");
                 attendanceRepository.save(attendance);
 
-                logAudit(doctor, "AUTOMATED_ABSENTEE_CHECK", null, null, null, null,
-                         "AUTOMATED_ABSENTEE_ALERT", "Doctor failed to check-in by cut-off time");
-                newlyFlaggedAbsent++;
+                if (onApprovedLeave) {
+                    logAudit(doctor, "AUTOMATED_ABSENTEE_CHECK", null, null, null, null,
+                             "AUTOMATED_LEAVE_EXEMPTION", "Doctor exempted from absentee alert due to approved leave");
+                } else {
+                    logAudit(doctor, "AUTOMATED_ABSENTEE_CHECK", null, null, null, null,
+                             "AUTOMATED_ABSENTEE_ALERT", "Doctor failed to check-in by cut-off time");
+                    newlyFlaggedAbsent++;
+                }
             }
         }
         return newlyFlaggedAbsent;
@@ -638,6 +651,11 @@ public class AttendanceService {
         List<java.util.Map<String, Object>> alerts = new java.util.ArrayList<>();
 
         for (Doctor doctor : doctors) {
+            boolean onApprovedLeave = leaveService != null && leaveService.isDoctorOnApprovedLeave(doctor, today);
+            if (onApprovedLeave) {
+                continue; // Skip doctors on approved leave from absentee alert list
+            }
+
             Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
             boolean isAbsent = existing.isEmpty() || "ABSENT".equals(existing.get().getStatus());
 

@@ -18,12 +18,15 @@ import org.mockito.Mockito;
 import com.ranjith.phcbackend.model.Attendance;
 import com.ranjith.phcbackend.model.AttendanceAuditLog;
 import com.ranjith.phcbackend.model.Doctor;
+import com.ranjith.phcbackend.model.LeaveRequest;
 import com.ranjith.phcbackend.model.PHC;
 import com.ranjith.phcbackend.repository.AttendanceAuditLogRepository;
 import com.ranjith.phcbackend.repository.AttendanceRepository;
 import com.ranjith.phcbackend.repository.DoctorRepository;
+import com.ranjith.phcbackend.repository.LeaveRequestRepository;
 import com.ranjith.phcbackend.repository.PHCRepository;
 import com.ranjith.phcbackend.service.AttendanceService;
+import com.ranjith.phcbackend.service.LeaveService;
 
 class AttendanceValidationTest {
 
@@ -214,4 +217,44 @@ class AttendanceValidationTest {
         assertTrue(secondLogin.containsKey("error"));
         assertTrue(secondLogin.get("error").toString().contains("Device binding restriction"));
     }
+
+    @Test
+    void testLeaveManagementWorkflow() {
+        LeaveRequestRepository leaveRepo = Mockito.mock(LeaveRequestRepository.class);
+        LeaveService leaveService = new LeaveService(leaveRepo, doctorRepository);
+
+        LeaveRequest sampleLeave = new LeaveRequest("CASUAL_LEAVE", LocalDate.now(), LocalDate.now().plusDays(2), "Medical conference", "PENDING", LocalDateTime.now(), sampleDoctor);
+        sampleLeave.setId(10L);
+
+        Mockito.when(leaveRepo.save(any(LeaveRequest.class))).thenAnswer(i -> {
+            LeaveRequest req = i.getArgument(0);
+            if (req.getId() == null) req.setId(10L);
+            return req;
+        });
+        Mockito.when(leaveRepo.findById(10L)).thenReturn(Optional.of(sampleLeave));
+
+        // 1. Doctor applies for leave
+        Map<String, Object> applyRes = leaveService.applyLeave(1L, "CASUAL_LEAVE", LocalDate.now(), LocalDate.now().plusDays(2), "Medical conference");
+        assertEquals("Leave application submitted successfully", applyRes.get("message"));
+
+        // 2. Admin reviews and approves leave
+        Map<String, Object> reviewRes = leaveService.reviewLeave(10L, "APPROVED");
+        assertEquals("APPROVED", reviewRes.get("status"));
+
+        // 3. Verify doctor is recognized as on approved leave
+        Mockito.when(leaveRepo.findByDoctorAndStatus(sampleDoctor, "APPROVED")).thenReturn(List.of(sampleLeave));
+        assertTrue(leaveService.isDoctorOnApprovedLeave(sampleDoctor, LocalDate.now()));
+
+        // 4. Inject LeaveService into AttendanceService & verify absentee check exempts doctor on approved leave
+        attendanceService.setLeaveService(leaveService);
+        Mockito.when(doctorRepository.findAll()).thenReturn(List.of(sampleDoctor));
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now())).thenReturn(Optional.empty());
+
+        int newlyFlagged = attendanceService.runAutomatedAbsenteeCheck();
+        assertEquals(0, newlyFlagged); // Doctor on approved leave should NOT be flagged as absent alert
+
+        List<Map<String, Object>> alerts = attendanceService.getAbsenteeAlerts();
+        assertTrue(alerts.isEmpty()); // Absentee alerts list should skip doctors on approved leave
+    }
 }
+
