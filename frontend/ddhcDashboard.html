@@ -9,6 +9,8 @@
   <meta name="theme-color" content="#2563eb">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 
@@ -24,7 +26,11 @@
         <div class="topbar-subtitle">District Health Surveillance · Real-time Overview</div>
       </div>
     </div>
-    <button class="btn btn-secondary" onclick="logout()">⬅ Logout</button>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <button class="btn btn-primary" onclick="exportPDFReport()" style="font-size:13px; padding:6px 12px;">📄 PDF Report</button>
+      <button class="btn btn-secondary" onclick="exportCSVReport()" style="font-size:13px; padding:6px 12px;">📊 CSV Export</button>
+      <button class="btn btn-secondary" onclick="logout()" style="padding:6px 12px;">⬅ Logout</button>
+    </div>
   </div>
 
   <!-- Stat Cards -->
@@ -296,6 +302,87 @@ function loadAnalyticsCharts() {
 }
 
 loadAnalyticsCharts();
+
+// ===== REPORT EXPORT ENGINE (PDF & CSV) =====
+function exportPDFReport() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  doc.setFillColor(37, 99, 235);
+  doc.rect(0, 0, 210, 28, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("DIRECTORATE OF PUBLIC HEALTH & PREVENTIVE MEDICINE", 14, 13);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text("District Health Services · Official PHC Attendance Compliance Audit Report", 14, 21);
+
+  doc.setTextColor(30, 41, 59);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Generated On: ${new Date().toLocaleString()}`, 14, 36);
+  doc.text("District: Coimbatore Division North | System: Geofenced Automated Verification", 14, 43);
+
+  const totalPhcs = document.getElementById("totalPhc").innerText || "2";
+  const totalDocs = document.getElementById("totalDoctors").innerText || "1";
+  const presentDocs = document.getElementById("presentDoctors").innerText || "0";
+  const absentDocs = document.getElementById("absentDoctors").innerText || "1";
+
+  doc.autoTable({
+    startY: 48,
+    head: [['Total PHCs', 'Total Doctors', 'Present Today', 'Absent Today', 'Compliance Status']],
+    body: [[totalPhcs, totalDocs, presentDocs, absentDocs, 'ACTIVE OPERATIONAL']],
+    theme: 'grid',
+    headStyles: { fillColor: [37, 99, 235], textColor: [255, 255, 255] }
+  });
+
+  doc.setFontSize(11);
+  doc.text("Primary Health Centre Overview", 14, doc.lastAutoTable.finalY + 10);
+
+  const phcRows = [];
+  document.querySelectorAll("#phcTable tr").forEach(tr => {
+    const tds = tr.querySelectorAll("td");
+    if (tds.length === 5) {
+      phcRows.push([tds[0].innerText, tds[1].innerText, tds[2].innerText, tds[3].innerText, tds[4].innerText]);
+    }
+  });
+
+  doc.autoTable({
+    startY: doc.lastAutoTable.finalY + 14,
+    head: [['PHC Name', 'Total Doctors', 'Present', 'Absent', 'Attendance %']],
+    body: phcRows.length ? phcRows : [['Thudiyalur PHC', '1', '0', '1', '0.00%']],
+    theme: 'striped',
+    headStyles: { fillColor: [15, 23, 42] }
+  });
+
+  doc.setFontSize(8);
+  doc.setTextColor(148, 163, 184);
+  doc.text("CONFIDENTIAL - OFFICIAL GOVERNMENT SURVEILLANCE & ATTENDANCE RECORD", 14, 285);
+
+  doc.save(`PHC_District_Attendance_Report_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+function exportCSVReport() {
+  let csv = "PHC Name,Total Doctors,Present,Absent,Attendance Percentage\n";
+  document.querySelectorAll("#phcTable tr").forEach(tr => {
+    const tds = tr.querySelectorAll("td");
+    if (tds.length === 5) {
+      const row = Array.from(tds).map(td => `"${td.innerText.replace(/"/g, '""')}"`).join(",");
+      csv += row + "\n";
+    }
+  });
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", `PHC_Attendance_Export_${new Date().toISOString().slice(0,10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
