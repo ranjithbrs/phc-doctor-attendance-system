@@ -288,5 +288,14 @@ class AttendanceValidationTest {
         Map<String, Object> secondItem = feed.get(1);
         assertEquals("CRITICAL", secondItem.get("severity"));
     }
+
+    @Test
+    void testPwaAssetConfiguration() {
+        java.io.File manifestFile = new java.io.File("c:/Users/B Ranjith/Downloads/phc-doctor-attendance-system/frontend/manifest.json");
+        java.io.File swFile = new java.io.File("c:/Users/B Ranjith/Downloads/phc-doctor-attendance-system/frontend/sw.js");
+
+        assertTrue(manifestFile.exists(), "PWA manifest.json should exist");
+        assertTrue(swFile.exists(), "PWA sw.js service worker should exist");
+    }
 }
 

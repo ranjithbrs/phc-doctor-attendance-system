@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Attendance History - PHC Attendance</title>
   <meta name="description" content="View and filter your attendance history with check-in and check-out records.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -130,6 +132,14 @@ function filterHistory() {
 
 function goBack() {
   window.location.href = "docDashboard.html";
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('PWA ServiceWorker active:', reg.scope))
+      .catch(err => console.log('ServiceWorker registration failed:', err));
+  });
 }
 
 </script>

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PHC Doctor Attendance System - Register</title>
   <meta name="description" content="Register as a Doctor or Admin for PHC Doctor Attendance System.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -138,8 +140,15 @@ document.getElementById("registerForm").addEventListener("submit", async functio
     errorMsg.classList.add("show");
     btn.innerHTML = "Register Account";
     btn.disabled = false;
-  }
 });
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('PWA ServiceWorker active:', reg.scope))
+      .catch(err => console.log('ServiceWorker registration failed:', err));
+  });
+}
 </script>
 </body>
 </html>

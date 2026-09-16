@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DDHS Central Dashboard - PHC Attendance</title>
   <meta name="description" content="DDHS admin dashboard for monitoring PHC doctor attendance across all health centres.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -235,6 +237,14 @@ function loadSurveillanceFeed() {
 
 loadSurveillanceFeed();
 setInterval(loadSurveillanceFeed, 10000); // Refresh surveillance feed every 10s
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('PWA ServiceWorker active:', reg.scope))
+      .catch(err => console.log('ServiceWorker registration failed:', err));
+  });
+}
 
 </script>
 </body>

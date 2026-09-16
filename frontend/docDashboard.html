@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doctor Dashboard - PHC Attendance</title>
   <meta name="description" content="Doctor dashboard for geo-fenced check-in and attendance tracking at PHC.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2563eb">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -320,6 +322,14 @@ document.getElementById("checkOutBtn").addEventListener("click", () => {
 
 function logout()      { localStorage.clear(); window.location.href = "index.html"; }
 function goToHistory() { window.location.href = "attendanceHistory.html"; }
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('PWA ServiceWorker active:', reg.scope))
+      .catch(err => console.log('ServiceWorker registration failed:', err));
+  });
+}
 
 </script>
 </body>
