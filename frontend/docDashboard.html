@@ -70,7 +70,8 @@ if (!doctorId || doctorId === "undefined" || doctorId === "null") {
   window.location.href = "index.html";
 }
 
-document.getElementById("doctorName").innerText = doctorName;
+const cleanName = doctorName.replace(/^Dr\.?\s*/i, '');
+document.getElementById("doctorName").innerText = cleanName;
 document.getElementById("todayDate").innerText  = new Date().toDateString();
 
 // ===== MAP =====

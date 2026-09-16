@@ -75,7 +75,8 @@ if (!doctorId || doctorId === "undefined" || doctorId === "null") {
   window.location.href = "index.html";
 }
 
-document.getElementById("doctorSubtitle").textContent = `Dr. ${doctorName} · Attendance Log`;
+const cleanName = doctorName.replace(/^Dr\.?\s*/i, '');
+document.getElementById("doctorSubtitle").textContent = `Dr. ${cleanName} · Attendance Log`;
 
 document.addEventListener("DOMContentLoaded", () => loadHistory());
 
