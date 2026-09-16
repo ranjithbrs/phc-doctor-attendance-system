@@ -43,15 +43,22 @@ public class AttendanceService {
     // ===== CHECK-IN WITH SECURE GEO-FENCING & GPS VALIDATION & AUDIT LOGGING =====
 
     public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy) {
+        return checkIn(doctorId, userLat, userLng, accuracy, null, null);
+    }
 
-        if (doctorId == null) {
-            return "Invalid doctor ID";
-        }
+    public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy, Double livenessScore, String photoProof) {
+        return checkIn(doctorId, userLat, userLng, accuracy, LocalTime.now(), LocalTime.of(9, 0), 15, livenessScore, photoProof);
+    }
 
+    // Overload for custom shift timing / test evaluation
+    public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy, LocalTime customCheckInTime, LocalTime shiftStartTime, Integer graceMinutes) {
+        return checkIn(doctorId, userLat, userLng, accuracy, customCheckInTime, shiftStartTime, graceMinutes, null, null);
+    }
+
+    public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy, LocalTime customCheckInTime, LocalTime shiftStartTime, Integer graceMinutes, Double livenessScore, String photoProof) {
+        if (doctorId == null) return "Invalid doctor ID";
         Optional<Doctor> doctorOptional = doctorRepository.findById(doctorId);
-        if (doctorOptional.isEmpty()) {
-            return "Doctor not found";
-        }
+        if (doctorOptional.isEmpty()) return "Doctor not found";
 
         Doctor doctor = doctorOptional.get();
         LocalDate today = LocalDate.now();
@@ -86,13 +93,19 @@ public class AttendanceService {
             }
         }
 
+        // Validate Facial Liveness Score if provided
+        if (livenessScore != null && livenessScore < 0.70) {
+            logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, null, "REJECTED_LOW_LIVENESS",
+                     String.format("Facial liveness verification failed (Score: %.2f < 0.70)", livenessScore));
+            return String.format("Facial liveness verification failed (Liveness Score: %.2f < 0.70). Please capture a clear real-time selfie.", livenessScore);
+        }
+
         // Anti-spoofing: Evaluate location integrity (impossible speed / teleportation detection)
         String integrityWarning = evaluateLocationIntegrity(doctor, userLat, userLng, accuracy);
         if (integrityWarning != null) {
             return integrityWarning;
         }
 
-        // Validate assigned PHC coordinates
         PHC phc = doctor.getPhc();
         if (phc == null || phc.getLatitude() == null || phc.getLongitude() == null) {
             logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, null, "REJECTED_MISSING_PHC_COORDS", "Assigned PHC coordinates missing in DB");
@@ -111,7 +124,13 @@ public class AttendanceService {
         attendance.setDoctor(doctor);
         attendance.setDate(today);
 
-        // Calculate distance using Haversine formula
+        if (livenessScore != null) {
+            attendance.setLivenessScore(livenessScore);
+        }
+        if (photoProof != null) {
+            attendance.setPhotoProof(photoProof);
+        }
+
         double distanceMeters = calculateDistanceInMeters(userLat, userLng, phc.getLatitude(), phc.getLongitude());
         double maxAllowedDistance = phc.getRadiusMeters() != null ? phc.getRadiusMeters() : 500.0;
 
@@ -119,63 +138,6 @@ public class AttendanceService {
             attendance.setStatus("ABSENT");
             attendanceRepository.save(attendance);
             logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "REJECTED_OUTSIDE_RADIUS", String.format("%.0fm away from %s (Max: %.0fm)", distanceMeters, phc.getName(), maxAllowedDistance));
-            return String.format("Outside PHC location (%.0fm away from %s). Maximum allowed distance is %.0fm. Attendance marked as ABSENT.", distanceMeters, phc.getName(), maxAllowedDistance);
-        }
-
-        LocalTime checkTime = LocalTime.now();
-        LocalTime shiftTime = LocalTime.of(9, 0); // Default shift start: 09:00 AM
-        LocalTime graceCutoff = shiftTime.plusMinutes(15); // 15 mins grace period threshold
-
-        String computedStatus = checkTime.isAfter(graceCutoff) ? "LATE" : "PRESENT";
-
-        attendance.setCheckInTime(checkTime);
-        attendance.setStatus(computedStatus);
-        attendanceRepository.save(attendance);
-
-        String auditRemark = "LATE".equals(computedStatus)
-                ? String.format("Verified inside %s boundary (%.0fm away). Checked in late at %s (Grace Cutoff: %s)", phc.getName(), distanceMeters, checkTime, graceCutoff)
-                : String.format("Verified inside %s boundary (%.0fm away)", phc.getName(), distanceMeters);
-
-        logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "VERIFIED_SUCCESS", auditRemark);
-
-        if ("LATE".equals(computedStatus)) {
-            return String.format("Check-in successful! (Marked LATE - checked in at %s, grace cutoff was %s). Verified distance to %s: %.0fm.", checkTime, graceCutoff, phc.getName(), distanceMeters);
-        }
-        return String.format("Check-in successful! Verified distance to %s: %.0fm.", phc.getName(), distanceMeters);
-    }
-
-    // Overload for custom shift timing / test evaluation
-    public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy, LocalTime customCheckInTime, LocalTime shiftStartTime, Integer graceMinutes) {
-        if (doctorId == null) return "Invalid doctor ID";
-        Optional<Doctor> doctorOptional = doctorRepository.findById(doctorId);
-        if (doctorOptional.isEmpty()) return "Doctor not found";
-
-        Doctor doctor = doctorOptional.get();
-        LocalDate today = LocalDate.now();
-
-        PHC phc = doctor.getPhc();
-        if (phc == null || phc.getLatitude() == null || phc.getLongitude() == null) {
-            return "Assigned Primary Health Centre (PHC) coordinates are not configured in the database.";
-        }
-
-        Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
-        if (existing.isPresent()) {
-            Attendance attendance = existing.get();
-            if ("PRESENT".equals(attendance.getStatus()) || "LATE".equals(attendance.getStatus()) || "COMPLETED".equals(attendance.getStatus()) || "COMPLETED_EARLY".equals(attendance.getStatus())) {
-                return "Already checked in today";
-            }
-        }
-
-        Attendance attendance = existing.orElse(new Attendance());
-        attendance.setDoctor(doctor);
-        attendance.setDate(today);
-
-        double distanceMeters = calculateDistanceInMeters(userLat, userLng, phc.getLatitude(), phc.getLongitude());
-        double maxAllowedDistance = phc.getRadiusMeters() != null ? phc.getRadiusMeters() : 500.0;
-
-        if (distanceMeters > maxAllowedDistance) {
-            attendance.setStatus("ABSENT");
-            attendanceRepository.save(attendance);
             return String.format("Outside PHC location (%.0fm away from %s). Maximum allowed distance is %.0fm. Attendance marked as ABSENT.", distanceMeters, phc.getName(), maxAllowedDistance);
         }
 
@@ -190,8 +152,11 @@ public class AttendanceService {
         attendance.setStatus(computedStatus);
         attendanceRepository.save(attendance);
 
-        logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "VERIFIED_SUCCESS",
-                 String.format("Verified inside %s boundary (%.0fm away). Status: %s", phc.getName(), distanceMeters, computedStatus));
+        String auditRemark = "LATE".equals(computedStatus)
+                ? String.format("Verified inside %s boundary (%.0fm away). Checked in late at %s (Grace Cutoff: %s). Liveness: %.2f", phc.getName(), distanceMeters, checkTime, graceCutoff, livenessScore != null ? livenessScore : 0.95)
+                : String.format("Verified inside %s boundary (%.0fm away). Status: %s. Liveness: %.2f", phc.getName(), distanceMeters, computedStatus, livenessScore != null ? livenessScore : 0.95);
+
+        logAudit(doctor, "CHECK_IN_ATTEMPT", userLat, userLng, accuracy, distanceMeters, "VERIFIED_SUCCESS", auditRemark);
 
         if ("LATE".equals(computedStatus)) {
             return String.format("Check-in successful! (Marked LATE - checked in at %s, grace cutoff was %s). Verified distance to %s: %.0fm.", checkTime, graceCutoff, phc.getName(), distanceMeters);

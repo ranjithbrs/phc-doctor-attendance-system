@@ -69,7 +69,18 @@ public class AttendanceController {
             return ResponseEntity.badRequest().body(Map.of("message", "Longitude must be between -180 and +180 degrees."));
         }
 
-        String result = attendanceService.checkIn(doctorId, latitude, longitude, accuracy);
+        Double livenessScore = null;
+        String photoProof = null;
+        if (request.get("livenessScore") != null) {
+            try {
+                livenessScore = Double.valueOf(request.get("livenessScore").toString());
+            } catch (Exception e) {}
+        }
+        if (request.get("photoProof") != null) {
+            photoProof = request.get("photoProof").toString();
+        }
+
+        String result = attendanceService.checkIn(doctorId, latitude, longitude, accuracy, livenessScore, photoProof);
 
         // Determine success or error response status
         if (result != null && result.startsWith("Check-in successful")) {

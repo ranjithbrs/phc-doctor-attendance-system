@@ -24,6 +24,11 @@ public class Attendance {
 
     private Integer presenceBreachCount = 0;
 
+    private Double livenessScore;
+
+    @Column(length = 2000)
+    private String photoProof;
+
     @ManyToOne
     @JoinColumn(name = "doctor_id", nullable = false)
     private Doctor doctor;
@@ -52,6 +57,8 @@ public class Attendance {
     public Doctor getDoctor() { return doctor; }
     public LocalTime getLastPresencePingTime() { return lastPresencePingTime; }
     public Integer getPresenceBreachCount() { return presenceBreachCount != null ? presenceBreachCount : 0; }
+    public Double getLivenessScore() { return livenessScore; }
+    public String getPhotoProof() { return photoProof; }
 
     // Setters
 
@@ -62,4 +69,6 @@ public class Attendance {
     public void setDoctor(Doctor doctor) { this.doctor = doctor; }
     public void setLastPresencePingTime(LocalTime lastPresencePingTime) { this.lastPresencePingTime = lastPresencePingTime; }
     public void setPresenceBreachCount(Integer presenceBreachCount) { this.presenceBreachCount = presenceBreachCount; }
+    public void setLivenessScore(Double livenessScore) { this.livenessScore = livenessScore; }
+    public void setPhotoProof(String photoProof) { this.photoProof = photoProof; }
 }

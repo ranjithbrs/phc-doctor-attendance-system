@@ -256,5 +256,18 @@ class AttendanceValidationTest {
         List<Map<String, Object>> alerts = attendanceService.getAbsenteeAlerts();
         assertTrue(alerts.isEmpty()); // Absentee alerts list should skip doctors on approved leave
     }
+
+    @Test
+    void testFacialLivenessVerification() {
+        // 1. Check-in with low liveness score (< 0.70) -> Rejects check-in
+        String lowScoreResult = attendanceService.checkIn(1L, 11.0168, 76.9558, 10.0, 0.45, "data:image/jpeg;base64,mockLowLivenessData");
+        assertTrue(lowScoreResult.contains("Facial liveness verification failed"));
+        assertTrue(lowScoreResult.contains("0.45"));
+
+        // 2. Check-in with valid liveness score (>= 0.70) -> Succeeds and persists score & photo proof
+        String validScoreResult = attendanceService.checkIn(1L, 11.0168, 76.9558, 10.0, 0.98, "data:image/jpeg;base64,mockValidPhotoData");
+        assertTrue(validScoreResult.startsWith("Check-in successful!"));
+        verify(attendanceRepository).save(any(Attendance.class));
+    }
 }
 
