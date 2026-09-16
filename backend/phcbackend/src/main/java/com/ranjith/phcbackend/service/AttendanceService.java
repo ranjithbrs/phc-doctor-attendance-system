@@ -873,4 +873,24 @@ public class AttendanceService {
         return result;
     }
 
+    // ===== EMERGENCY SOS BROADCAST MODE =====
+    private static boolean sosActive = false;
+    private static String sosMessage = "CRITICAL: Epidemic outbreak alert. All PHC doctors report for emergency duty immediately.";
+
+    public Map<String, Object> getEmergencySosStatus() {
+        Map<String, Object> res = new HashMap<>();
+        res.put("active", sosActive);
+        res.put("message", sosMessage);
+        res.put("timestamp", LocalDateTime.now().toString());
+        return res;
+    }
+
+    public Map<String, Object> toggleEmergencySos(boolean active, String customMsg) {
+        sosActive = active;
+        if (customMsg != null && !customMsg.isBlank()) {
+            sosMessage = customMsg;
+        }
+        return getEmergencySosStatus();
+    }
+
 }

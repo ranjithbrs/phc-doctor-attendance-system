@@ -28,6 +28,17 @@
     <button class="btn btn-secondary" onclick="logout()">⬅ Logout</button>
   </div>
 
+  <!-- Emergency Outbreak SOS Notification Banner -->
+  <div id="emergencySosBanner" style="display:none; background:#fff1f2; border:2px solid #e11d48; border-radius:12px; padding:14px 18px; margin-bottom:20px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="font-size:26px;">🚨</div>
+      <div>
+        <div style="color:#e11d48; font-weight:800; font-size:14px; text-transform:uppercase; letter-spacing:0.5px;">District Emergency SOS Duty Active</div>
+        <div id="sosBannerMessage" style="color:#9f1239; font-size:13px; font-weight:600; margin-top:2px;">CRITICAL: Epidemic outbreak alert. All PHC doctors report for emergency duty immediately.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Attendance Status Banner -->
   <div class="status-banner">
     <div class="status-label">Today's Attendance Status</div>
@@ -196,6 +207,25 @@ function loadComplianceScore() {
     })
     .catch(() => {});
 }
+
+function checkEmergencySos() {
+  fetch(`${API_BASE_URL}/attendance/emergency-sos`)
+    .then(res => res.json())
+    .then(data => {
+      const banner = document.getElementById("emergencySosBanner");
+      const msg = document.getElementById("sosBannerMessage");
+      if (data && data.active) {
+        msg.innerText = data.message || "CRITICAL: Epidemic outbreak alert. All PHC doctors report for emergency duty immediately.";
+        banner.style.display = "block";
+      } else {
+        banner.style.display = "none";
+      }
+    })
+    .catch(() => {});
+}
+
+checkEmergencySos();
+setInterval(checkEmergencySos, 15000);
 
 function sendPresencePing() {
   if (!navigator.geolocation) return;

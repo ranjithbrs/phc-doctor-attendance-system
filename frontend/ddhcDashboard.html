@@ -33,6 +33,18 @@
     </div>
   </div>
 
+  <!-- Emergency Outbreak SOS Duty Broadcast Bar -->
+  <div style="background:#fff1f2; border:1px solid #fecdd3; border-radius:10px; padding:12px 18px; margin-bottom:20px; display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-size:20px;">🚨</span>
+      <div>
+        <strong style="color:#9f1239; font-size:14px;">District Emergency SOS Broadcast:</strong>
+        <span id="sosStatusText" style="color:#881337; font-size:13px; margin-left:6px;">Inactive (Standard Operations)</span>
+      </div>
+    </div>
+    <button id="sosToggleBtn" class="btn btn-danger" onclick="toggleSosMode()" style="font-size:12px; padding:6px 14px; background:#e11d48; border:none;">🚨 Trigger Emergency SOS Mode</button>
+  </div>
+
   <!-- Stat Cards -->
   <div class="stats-grid">
     <div class="stat-card stat-card-phc">
@@ -383,6 +395,43 @@ function exportCSVReport() {
   link.click();
   document.body.removeChild(link);
 }
+
+// ===== EMERGENCY SOS MODE =====
+let currentSosActive = false;
+
+function checkSosStatus() {
+  fetch(`${API_BASE_URL}/attendance/emergency-sos`)
+    .then(res => res.json())
+    .then(data => {
+      currentSosActive = data && data.active;
+      const statusTxt = document.getElementById("sosStatusText");
+      const btn = document.getElementById("sosToggleBtn");
+      if (data && data.active) {
+        statusTxt.innerHTML = `<strong style="color:#e11d48;">🚨 ACTIVE BROADCAST: ${data.message}</strong>`;
+        btn.innerText = "🛑 Deactivate SOS Broadcast";
+        btn.style.background = "#475569";
+      } else {
+        statusTxt.innerText = "Inactive (Standard Operations)";
+        btn.innerText = "🚨 Trigger Emergency SOS Mode";
+        btn.style.background = "#e11d48";
+      }
+    })
+    .catch(() => {});
+}
+
+function toggleSosMode() {
+  const newActive = !currentSosActive;
+  fetch(`${API_BASE_URL}/attendance/emergency-sos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ active: newActive })
+  })
+  .then(res => res.json())
+  .then(() => checkSosStatus())
+  .catch(() => {});
+}
+
+checkSosStatus();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

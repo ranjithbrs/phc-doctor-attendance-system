@@ -276,4 +276,18 @@ public class AttendanceController {
         }
         return ResponseEntity.ok(result);
     }
+
+    // ===== EMERGENCY SOS BROADCAST ENDPOINTS =====
+
+    @GetMapping("/emergency-sos")
+    public ResponseEntity<?> getEmergencySos() {
+        return ResponseEntity.ok(attendanceService.getEmergencySosStatus());
+    }
+
+    @PostMapping("/emergency-sos")
+    public ResponseEntity<?> toggleEmergencySos(@RequestBody Map<String, Object> req) {
+        boolean active = req != null && req.get("active") != null && Boolean.parseBoolean(req.get("active").toString());
+        String msg = req != null && req.get("message") != null ? req.get("message").toString() : null;
+        return ResponseEntity.ok(attendanceService.toggleEmergencySos(active, msg));
+    }
 }
