@@ -24,6 +24,10 @@ public class AuthService {
     }
 
     public Map<String, Object> login(String email, String password) {
+        return login(email, password, null);
+    }
+
+    public Map<String, Object> login(String email, String password, String deviceId) {
         Optional<Doctor> doctorOptional = doctorRepository.findByEmail(email);
 
         if (doctorOptional.isEmpty()) {
@@ -37,6 +41,18 @@ public class AuthService {
             return null;
         }
 
+        // Device Binding Check for Doctor role
+        if ("DOCTOR".equalsIgnoreCase(doctor.getRole()) && deviceId != null && !deviceId.isBlank()) {
+            if (doctor.getRegisteredDeviceId() == null || doctor.getRegisteredDeviceId().isBlank()) {
+                doctor.setRegisteredDeviceId(deviceId);
+                doctorRepository.save(doctor);
+            } else if (!doctor.getRegisteredDeviceId().equals(deviceId)) {
+                Map<String, Object> errResponse = new HashMap<>();
+                errResponse.put("error", "Device binding restriction: Login rejected. This doctor account is locked to another registered primary device.");
+                return errResponse;
+            }
+        }
+
         // Generate session token
         String token = SecurityUtil.createSession(doctor.getId(), doctor.getName(), doctor.getEmail(), doctor.getRole());
 
@@ -44,6 +60,7 @@ public class AuthService {
         response.put("doctorId", doctor.getId());
         response.put("name", doctor.getName());
         response.put("role", doctor.getRole());
+        response.put("registeredDeviceId", doctor.getRegisteredDeviceId());
         response.put("token", token);
 
         return response;

@@ -57,17 +57,23 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
   btn.innerHTML = '<span class="spinner"></span> Signing in...';
   btn.disabled = true;
 
+  let deviceId = localStorage.getItem("PHC_DEVICE_ID");
+  if (!deviceId) {
+    deviceId = "PHC_DEV_" + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+    localStorage.setItem("PHC_DEVICE_ID", deviceId);
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, deviceId })
     });
 
     const data = await response.json();
 
     if (!response.ok) {
-      errorMsg.textContent = data.message || "Invalid email or password";
+      errorMsg.textContent = data.error || data.message || "Invalid email or password";
       errorMsg.classList.add("show");
       btn.innerHTML = "Sign In";
       btn.disabled = false;

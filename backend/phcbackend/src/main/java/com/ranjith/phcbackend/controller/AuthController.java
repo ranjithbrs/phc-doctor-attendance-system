@@ -28,13 +28,18 @@ public class AuthController {
 
         String email = request.get("email");
         String password = request.get("password");
+        String deviceId = request.get("deviceId");
 
-        Map<String, Object> loginResponse = authService.login(email, password);
+        Map<String, Object> loginResponse = authService.login(email, password, deviceId);
 
         if (loginResponse == null) {
             Map<String, String> error = new HashMap<>();
             error.put("message", "Invalid email or password");
             return ResponseEntity.status(401).body(error);
+        }
+
+        if (loginResponse.containsKey("error")) {
+            return ResponseEntity.status(403).body(loginResponse);
         }
 
         Map<String, Object> response = new HashMap<>();
@@ -43,6 +48,9 @@ public class AuthController {
         response.put("name", loginResponse.get("name"));
         response.put("role", loginResponse.get("role"));
         response.put("token", loginResponse.get("token"));
+        if (loginResponse.get("registeredDeviceId") != null) {
+            response.put("registeredDeviceId", loginResponse.get("registeredDeviceId"));
+        }
 
         return ResponseEntity.ok(response);
     }

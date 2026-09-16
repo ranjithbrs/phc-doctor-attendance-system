@@ -22,6 +22,7 @@ import com.ranjith.phcbackend.model.PHC;
 import com.ranjith.phcbackend.repository.AttendanceAuditLogRepository;
 import com.ranjith.phcbackend.repository.AttendanceRepository;
 import com.ranjith.phcbackend.repository.DoctorRepository;
+import com.ranjith.phcbackend.repository.PHCRepository;
 import com.ranjith.phcbackend.service.AttendanceService;
 
 class AttendanceValidationTest {
@@ -191,5 +192,26 @@ class AttendanceValidationTest {
         assertFalse(anomalies.isEmpty());
         assertTrue(anomalies.stream().anyMatch(a -> "SUSPECTED_GPS_SPOOFING".equals(a.get("anomalyType"))));
         assertTrue(anomalies.stream().anyMatch(a -> "HIGH_PRESENCE_BREACHES".equals(a.get("anomalyType"))));
+    }
+
+    @Test
+    void testDeviceBindingEnforcement() {
+        PHCRepository phcRepo = Mockito.mock(PHCRepository.class);
+        com.ranjith.phcbackend.service.AuthService authService = new com.ranjith.phcbackend.service.AuthService(doctorRepository, phcRepo);
+
+        Doctor doc = new Doctor("Dr. Kumar", "kumar@phc.gov.in", "pass123", "Physician", "DOCTOR", null);
+        Mockito.when(doctorRepository.findByEmail("kumar@phc.gov.in")).thenReturn(Optional.of(doc));
+
+        // Initial login from Device A -> Binds Device A
+        Map<String, Object> firstLogin = authService.login("kumar@phc.gov.in", "pass123", "PHC_DEV_DEVICE_A");
+        assertNotNull(firstLogin);
+        assertFalse(firstLogin.containsKey("error"));
+        assertEquals("PHC_DEV_DEVICE_A", doc.getRegisteredDeviceId());
+
+        // Subsequent login from Unauthorized Device B -> Rejects login
+        Map<String, Object> secondLogin = authService.login("kumar@phc.gov.in", "pass123", "PHC_DEV_DEVICE_UNAUTHORIZED_B");
+        assertNotNull(secondLogin);
+        assertTrue(secondLogin.containsKey("error"));
+        assertTrue(secondLogin.get("error").toString().contains("Device binding restriction"));
     }
 }

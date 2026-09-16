@@ -21,6 +21,8 @@ public class Doctor {
 
     private String role;   // ✅ ADD THIS
 
+    private String registeredDeviceId; // Hardware device binding UUID
+
     @ManyToOne
     @JoinColumn(name = "phc_id", nullable = false)
     private PHC phc;
@@ -65,6 +67,10 @@ public class Doctor {
         return role;
     }
 
+    public String getRegisteredDeviceId() {
+        return registeredDeviceId;
+    }
+
     public PHC getPhc() {
         return phc;
     }
@@ -89,6 +95,10 @@ public class Doctor {
 
     public void setRole(String role) {   // ✅ ADD THIS
         this.role = role;
+    }
+
+    public void setRegisteredDeviceId(String registeredDeviceId) {
+        this.registeredDeviceId = registeredDeviceId;
     }
 
     public void setPhc(PHC phc) {
