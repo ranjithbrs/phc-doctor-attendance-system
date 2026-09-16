@@ -39,6 +39,15 @@
 
     <div class="alert alert-danger" id="errorMsg"></div>
     <div class="alert alert-success" id="successMsg"></div>
+
+    <div style="margin-top:20px; padding:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:12px; text-align:center;">
+      <span style="color:#64748b;">API Backend: </span>
+      <strong id="connectedApiLabel" style="color:#2563eb; word-break:break-all;">Detecting...</strong>
+      <div style="margin-top:6px;">
+        <button type="button" onclick="switchBackend('http://localhost:8080')" style="background:#e0e7ff; color:#3730a3; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer; margin-right:6px;">Use Local (8080)</button>
+        <button type="button" onclick="switchBackend('https://phc-doctor-attendance-system.onrender.com')" style="background:#dcfce7; color:#166534; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;">Use Render Cloud</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -96,11 +105,19 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
   } catch (error) {
     console.error(error);
-    errorMsg.textContent = "Server error. Please try again.";
+    errorMsg.textContent = "Unable to reach backend server (" + API_BASE_URL + "). If using Render Cloud, please wait ~20s for cold-start or click 'Use Local (8080)'.";
     errorMsg.classList.add("show");
     btn.innerHTML = "Sign In";
     btn.disabled = false;
+  }
 });
+
+document.getElementById("connectedApiLabel").innerText = API_BASE_URL;
+
+function switchBackend(url) {
+  localStorage.setItem("API_BASE_URL", url);
+  window.location.reload();
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
