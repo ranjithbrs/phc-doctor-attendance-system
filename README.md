@@ -90,7 +90,7 @@ If you are a college examiner or reviewer looking for full architectural diagram
 🎓 *B.Tech Computer Science & Business Systems (CSBS)*  
 🏛️ *Nehru Institute of Engineering and Technology, Coimbatore*  
 
-- 💼 **LinkedIn**: [linkedin.com/in/ranjith-b-csbs23](https://linkedin.com/in/ranjith-b-csbs23)  
+- 💼 **LinkedIn**: [linkedin.com/in/ranjith-b-csbs](https://linkedin.com/in/ranjith-b-csbs)  
 - 🐙 **GitHub**: [github.com/ranjithbrs](https://github.com/ranjithbrs)  
 - 🌐 **Portfolio**: [ranjithbrs.github.io/portfolio](https://ranjithbrs.github.io/portfolio/)  
 - 📧 **Email**: ranjithb2k06@gmail.com  
