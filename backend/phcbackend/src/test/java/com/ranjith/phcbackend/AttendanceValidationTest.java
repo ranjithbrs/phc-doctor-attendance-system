@@ -297,5 +297,203 @@ class AttendanceValidationTest {
         assertTrue(manifestFile.exists(), "PWA manifest.json should exist");
         assertTrue(swFile.exists(), "PWA sw.js service worker should exist");
     }
-}
 
+    // ==========================================
+    // SYSTEM AUDIT & HARDENING TEST SUITE
+    // ==========================================
+
+    @Test
+    void testPreventDuplicateAttendanceRaceCondition() {
+        // Mock scenario: doctor has not yet checked in according to read query
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now()))
+                .thenReturn(Optional.empty());
+
+        // But concurrent thread inserts first, triggering the unique database constraint
+        Mockito.when(attendanceRepository.save(any(Attendance.class)))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("Duplicate entry uk_doctor_attendance_date"));
+
+        String result = attendanceService.checkIn(1L, 11.0168, 76.9558, 10.0);
+        assertEquals("Already checked in today", result);
+    }
+
+    @Test
+    void testAttendanceStatusTransitionsAndCheckoutValidation() {
+        // 1. Cannot checkout without checkin
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now()))
+                .thenReturn(Optional.empty());
+        String noCheckIn = attendanceService.checkOut(1L);
+        assertEquals("No check-in found for today", noCheckIn);
+
+        // 2. Doctor marked ABSENT cannot checkout
+        Attendance absentAtt = new Attendance(LocalDate.now(), null, null, "ABSENT", sampleDoctor);
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now()))
+                .thenReturn(Optional.of(absentAtt));
+        String absentCheckout = attendanceService.checkOut(1L);
+        assertTrue(absentCheckout.contains("marked ABSENT"));
+
+        // 3. Early checkout (< 4 hours worked) -> Transitions to COMPLETED_EARLY
+        Attendance presentAtt = new Attendance(LocalDate.now(), LocalTime.now().minusHours(2), null, "PRESENT", sampleDoctor);
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now()))
+                .thenReturn(Optional.of(presentAtt));
+        String earlyCheckout = attendanceService.checkOut(1L);
+        assertTrue(earlyCheckout.contains("Early Departure") || earlyCheckout.contains("Check-out successful"));
+        assertEquals("COMPLETED_EARLY", presentAtt.getStatus());
+
+        // 4. Repeated checkout attempt -> Rejected
+        String repeatCheckout = attendanceService.checkOut(1L);
+        assertEquals("Already checked out today", repeatCheckout);
+    }
+
+    @Test
+    void testDashboardStatisticsAccuracyAgainstDatabase() {
+        PHCRepository mockPhcRepo = Mockito.mock(PHCRepository.class);
+        DoctorRepository mockDocRepo = Mockito.mock(DoctorRepository.class);
+        AttendanceRepository mockAttRepo = Mockito.mock(AttendanceRepository.class);
+        LeaveService mockLeaveService = Mockito.mock(LeaveService.class);
+
+        com.ranjith.phcbackend.model.Division division = new com.ranjith.phcbackend.model.Division("Coimbatore North", "Coimbatore");
+        division.setId(1L);
+
+        PHC phc = new PHC("Thudiyalur PHC", "Coimbatore", "PHC", 11.0168, 76.9558, division);
+        phc.setId(10L);
+
+        Doctor doc1 = new Doctor("Dr. One (Late)", "doc1@phc.gov.in", "p1", "Gen", "DOCTOR", phc);
+        doc1.setId(101L);
+        Doctor doc2 = new Doctor("Doc Two (Early)", "doc2@phc.gov.in", "p2", "Gen", "DOCTOR", phc);
+        doc2.setId(102L);
+        Doctor doc3 = new Doctor("Doc Three (Leave)", "doc3@phc.gov.in", "p3", "Gen", "DOCTOR", phc);
+        doc3.setId(103L);
+        Doctor doc4 = new Doctor("Doc Four (Absent)", "doc4@phc.gov.in", "p4", "Gen", "DOCTOR", phc);
+        doc4.setId(104L);
+
+        List<Doctor> allDocs = List.of(doc1, doc2, doc3, doc4);
+        Mockito.when(mockPhcRepo.findAll()).thenReturn(List.of(phc));
+        Mockito.when(mockDocRepo.findAll()).thenReturn(allDocs);
+
+        LocalDate today = LocalDate.now();
+
+        // Doc 1 was LATE (should count as present/attended)
+        Attendance att1 = new Attendance(today, LocalTime.of(9, 30), null, "LATE", doc1);
+        Mockito.when(mockAttRepo.findByDoctorAndDate(doc1, today)).thenReturn(Optional.of(att1));
+
+        // Doc 2 was COMPLETED_EARLY (should count as present/attended)
+        Attendance att2 = new Attendance(today, LocalTime.of(9, 0), LocalTime.of(12, 0), "COMPLETED_EARLY", doc2);
+        Mockito.when(mockAttRepo.findByDoctorAndDate(doc2, today)).thenReturn(Optional.of(att2));
+
+        // Doc 3 is ON_LEAVE
+        Attendance att3 = new Attendance(today, null, null, "ON_LEAVE", doc3);
+        Mockito.when(mockAttRepo.findByDoctorAndDate(doc3, today)).thenReturn(Optional.of(att3));
+        Mockito.when(mockLeaveService.isDoctorOnApprovedLeave(doc3, today)).thenReturn(true);
+
+        // Doc 4 has no attendance (ABSENT)
+        Mockito.when(mockAttRepo.findByDoctorAndDate(doc4, today)).thenReturn(Optional.empty());
+        Mockito.when(mockLeaveService.isDoctorOnApprovedLeave(doc4, today)).thenReturn(false);
+
+        com.ranjith.phcbackend.service.DashboardService dashboardService =
+                new com.ranjith.phcbackend.service.DashboardService(mockPhcRepo, mockDocRepo, mockAttRepo, mockLeaveService);
+
+        // 1. Verify Summary Metrics
+        Map<String, Object> summary = dashboardService.getSummary(1L);
+        assertEquals(1, summary.get("totalPhc"));
+        assertEquals(4, summary.get("totalDoctors"));
+        assertEquals(2L, summary.get("presentDoctors"), "Doctors with LATE and COMPLETED_EARLY must be counted as present");
+        assertEquals(1L, summary.get("onLeaveDoctors"), "Doctors with approved leave must be counted as on leave");
+        assertEquals(1L, summary.get("absentDoctors"), "Only unexcused absent doctors must be counted as absent");
+
+        // 2. Verify PHC Overview
+        List<Map<String, Object>> overview = dashboardService.getPhcOverview(1L);
+        assertEquals(1, overview.size());
+        assertEquals(2L, overview.get(0).get("present"));
+        assertEquals(1L, overview.get(0).get("absent"));
+        assertEquals("50.00", overview.get(0).get("percentage"));
+
+        // 3. Verify Analytics Status Breakdown
+        Map<String, Object> analytics = dashboardService.getAnalytics(1L);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> breakdown = (Map<String, Object>) analytics.get("statusBreakdown");
+        assertNotNull(breakdown);
+        assertEquals(2L, breakdown.get("present"));
+        assertEquals(1L, breakdown.get("late"), "Late count should be accurately reflected");
+        assertEquals(1L, breakdown.get("onLeave"), "On leave count should match database records");
+        assertEquals(1L, breakdown.get("absent"), "Absent count should match unexcused absences");
+    }
+
+    @Test
+    void testSecurityUtilSessionAndRoleAuthorization() {
+        // 1. Password hashing & BCrypt verification
+        String rawPass = "SecretDoctorPass2026!";
+        String hashed = com.ranjith.phcbackend.security.SecurityUtil.hashPassword(rawPass);
+        assertNotEquals(rawPass, hashed);
+        assertTrue(com.ranjith.phcbackend.security.SecurityUtil.verifyPassword(rawPass, hashed));
+        assertFalse(com.ranjith.phcbackend.security.SecurityUtil.verifyPassword("WrongPass", hashed));
+
+        // 2. Token creation and role validation
+        String doctorToken = com.ranjith.phcbackend.security.SecurityUtil.createSession(55L, "Dr. User", "user@phc.gov.in", "DOCTOR");
+        String adminToken = com.ranjith.phcbackend.security.SecurityUtil.createSession(1L, "DDHS Admin", "admin@phc.gov.in", "ADMIN");
+
+        assertTrue(com.ranjith.phcbackend.security.SecurityUtil.isValidAdmin(adminToken));
+        assertFalse(com.ranjith.phcbackend.security.SecurityUtil.isValidAdmin(doctorToken));
+        assertFalse(com.ranjith.phcbackend.security.SecurityUtil.isValidAdmin("INVALID_TOKEN"));
+
+        // 3. Resource-level authorization: Doctor can only access own ID; Admin can access any
+        assertTrue(com.ranjith.phcbackend.security.SecurityUtil.isAuthorizedDoctor(doctorToken, 55L));
+        assertFalse(com.ranjith.phcbackend.security.SecurityUtil.isAuthorizedDoctor(doctorToken, 99L));
+        assertTrue(com.ranjith.phcbackend.security.SecurityUtil.isAuthorizedDoctor(adminToken, 99L));
+
+        // 4. Session invalidation
+        com.ranjith.phcbackend.security.SecurityUtil.invalidateSession(doctorToken);
+        assertNull(com.ranjith.phcbackend.security.SecurityUtil.getSession(doctorToken));
+    }
+
+    @Test
+    void testLeaveAuthorizationEnforcement() {
+        LeaveRequestRepository leaveRepo = Mockito.mock(LeaveRequestRepository.class);
+        LeaveService leaveService = new LeaveService(leaveRepo, doctorRepository);
+        com.ranjith.phcbackend.controller.LeaveController leaveController =
+                new com.ranjith.phcbackend.controller.LeaveController(leaveService);
+
+        String doctorToken = com.ranjith.phcbackend.security.SecurityUtil.createSession(10L, "Doctor", "doc@phc.gov.in", "DOCTOR");
+        String adminToken = com.ranjith.phcbackend.security.SecurityUtil.createSession(1L, "Admin", "admin@phc.gov.in", "ADMIN");
+
+        // Doctor trying to view pending leaves -> 403 Forbidden
+        org.springframework.http.ResponseEntity<?> doctorPending = leaveController.getPendingLeaves(doctorToken);
+        assertEquals(403, doctorPending.getStatusCode().value());
+
+        // Admin viewing pending leaves -> 200 OK
+        org.springframework.http.ResponseEntity<?> adminPending = leaveController.getPendingLeaves(adminToken);
+        assertEquals(200, adminPending.getStatusCode().value());
+
+        // Doctor trying to approve leave -> 403 Forbidden
+        org.springframework.http.ResponseEntity<?> doctorApprove = leaveController.reviewLeave(1L, Map.of("status", "APPROVED"), doctorToken);
+        assertEquals(403, doctorApprove.getStatusCode().value());
+    }
+
+    @Test
+    void testDatabaseConstraintsAndInvalidInputs() {
+        LeaveRequestRepository leaveRepo = Mockito.mock(LeaveRequestRepository.class);
+        LeaveService leaveService = new LeaveService(leaveRepo, doctorRepository);
+
+        // 1. Invalid date sequence: end date before start date
+        LocalDate start = LocalDate.now().plusDays(5);
+        LocalDate end = LocalDate.now().plusDays(2);
+        Map<String, Object> invalidDateRes = leaveService.applyLeave(1L, "CASUAL", start, end, "Reason");
+        assertTrue(invalidDateRes.containsKey("error"));
+        assertTrue(invalidDateRes.get("error").toString().contains("End date cannot be earlier than start date"));
+
+        // 2. Missing doctor ID
+        Map<String, Object> nullDocRes = leaveService.applyLeave(null, "CASUAL", LocalDate.now(), LocalDate.now().plusDays(1), "Reason");
+        assertTrue(nullDocRes.containsKey("error"));
+
+        // 3. Null coordinates for check-in
+        String nullCoords = attendanceService.checkIn(1L, null, 76.9558, 10.0);
+        assertTrue(nullCoords.contains("required"));
+
+        // 4. Latitude outside [-90, +90]
+        String invalidLat = attendanceService.checkIn(1L, -95.0, 76.9558, 10.0);
+        assertTrue(invalidLat.contains("Invalid latitude"));
+
+        // 5. Longitude outside [-180, +180]
+        String invalidLng = attendanceService.checkIn(1L, 11.0, 195.0, 10.0);
+        assertTrue(invalidLng.contains("Invalid longitude"));
+    }
+}

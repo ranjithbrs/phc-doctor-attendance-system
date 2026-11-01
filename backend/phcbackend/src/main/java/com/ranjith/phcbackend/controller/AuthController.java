@@ -98,4 +98,12 @@ public class AuthController {
     public ResponseEntity<?> getPhcs() {
         return ResponseEntity.ok(authService.getAllPhcs());
     }
+
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String token) {
+        if (token != null) {
+            com.ranjith.phcbackend.security.SecurityUtil.invalidateSession(token);
+        }
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+    }
 }
