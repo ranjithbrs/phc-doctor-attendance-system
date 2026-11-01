@@ -152,7 +152,11 @@ public class AttendanceService {
 
         attendance.setCheckInTime(checkTime);
         attendance.setStatus(computedStatus);
-        attendanceRepository.save(attendance);
+        try {
+            attendanceRepository.save(attendance);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            return "Already checked in today";
+        }
 
         String auditRemark = "LATE".equals(computedStatus)
                 ? String.format("Verified inside %s boundary (%.0fm away). Checked in late at %s (Grace Cutoff: %s). Liveness: %.2f", phc.getName(), distanceMeters, checkTime, graceCutoff, livenessScore != null ? livenessScore : 0.95)
@@ -500,7 +504,11 @@ public class AttendanceService {
 
         attendance.setStatus("ABSENT");
 
-        attendanceRepository.save(attendance);
+        try {
+            attendanceRepository.save(attendance);
+        } catch (Exception e) {
+            return;
+        }
 
     }
 

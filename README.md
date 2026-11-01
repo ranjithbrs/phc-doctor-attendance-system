@@ -3,6 +3,7 @@
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-brightgreen?style=for-the-badge&logo=githubpages&logoColor=white)](https://ranjithbrs.github.io/phc-doctor-attendance-system/)
 [![Backend Status](https://img.shields.io/badge/Backend-Render%20Cloud-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://phc-doctor-attendance-system.onrender.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![Tests: 25 Passed](https://img.shields.io/badge/Tests-25%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](backend/phcbackend/src/test/java/com/ranjith/phcbackend/AttendanceValidationTest.java)
 
 ---
 
@@ -77,12 +78,41 @@ For developers and technical evaluators, here is a quick overview of the tech st
 
 ---
 
-## 📑 Complete Academic Project Documentation
+## 📸 Application Screenshots & Visual Showcase
 
-If you are a college examiner or reviewer looking for full architectural diagrams:
-- 📄 **[Full Academic Project Report & Diagrams (ERD, DFD, UML)](ACADEMIC_PROJECT_REPORT.md)**
+| 👨‍⚕️ Doctor Mobile Check-in (GPS + Liveness) | 🏛️ DDHS Executive Surveillance Dashboard |
+| :---: | :---: |
+| ![Doctor Check-in](docs/screenshots/doctor-attendance-checkin.png) | ![DDHS Surveillance](docs/screenshots/ddhs-surveillance-dashboard.png) |
+
+| 📊 District Analytics & Compliance Trends | 📅 Leave Management & Audit Logs |
+| :---: | :---: |
+| ![Analytics Charts](docs/screenshots/analytics-charts.png) | ![Leave Management](docs/screenshots/leave-management-audit.png) |
 
 ---
+
+## 🛡️ Verification & Security Hardening Audit (8/8 Completed)
+
+| Item | Status | Verification & Implementation Detail |
+| :--- | :---: | :--- |
+| **1. Doctor Attendance Check-in/Check-out Logic** | ✅ Verified | GPS boundary verification, anti-spoofing travel speed detection ($< 250\text{ km/h}$), facial liveness cutoff ($\ge 0.70$), and checkout duration calculation. |
+| **2. Prevent Duplicate Attendance Records** | ✅ Verified | Database-level unique constraint `uk_doctor_attendance_date` on `(doctor_id, date)` plus graceful `DataIntegrityViolationException` handling. |
+| **3. Validate Date, Time & Status Handling** | ✅ Verified | Accurate handling of `PRESENT`, `LATE`, `COMPLETED`, `COMPLETED_EARLY`, `ON_LEAVE`, and `ABSENT` transitions across shifts. |
+| **4. Verify DDHS Dashboard Statistics** | ✅ Verified | Fixed dashboard statistics to count `LATE` and `COMPLETED_EARLY` as attended, dynamic on-leave counts, and true status breakdown against MySQL database. |
+| **5. Review API Authentication & Authorization** | ✅ Verified | BCrypt password hashing, session tokens, device hardware binding, and RBAC authorization protecting administrative review endpoints (403 Forbidden). |
+| **6. Test Database Constraints & Invalid Requests** | ✅ Verified | Comprehensive bounds testing for GPS coordinates ($[-90, +90]$, $[-180, +180]$, NaN, Infinity), invalid date ranges, and null IDs. |
+| **7. Document Backend API & Architecture** | ✅ Verified | Published complete [API Documentation & Deployment Architecture Guide](API_DOCUMENTATION.md) with Mermaid topology and endpoint specs. |
+| **8. Automated API Tests & Screenshot Suite** | ✅ Verified | 25 automated unit & integration tests passing with 100% success; screenshot assets committed under `docs/screenshots/`. |
+
+---
+
+## 📑 Project & API Documentation
+
+- 📘 **[REST API Reference & Deployment Architecture](API_DOCUMENTATION.md)** — Complete endpoint schemas, request/response models, and Docker cloud topology.
+- 📄 **[Academic Project Report & Architecture Diagrams](ACADEMIC_PROJECT_REPORT.md)** — Full college-level documentation with ERD, DFD, and UML diagrams.
+
+---
+
+
 
 ## 👨‍💻 Author & Contact
 

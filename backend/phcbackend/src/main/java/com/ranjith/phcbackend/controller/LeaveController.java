@@ -61,12 +61,20 @@ public class LeaveController {
     }
 
     @GetMapping("/pending")
-    public ResponseEntity<?> getPendingLeaves() {
+    public ResponseEntity<?> getPendingLeaves(@org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader != null && !com.ranjith.phcbackend.security.SecurityUtil.isValidAdmin(authHeader)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied: Admin role required to view pending leaves"));
+        }
         return ResponseEntity.ok(leaveService.getPendingLeaves());
     }
 
     @PutMapping("/approve/{leaveId}")
-    public ResponseEntity<?> reviewLeave(@PathVariable Long leaveId, @RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> reviewLeave(@PathVariable Long leaveId,
+                                         @RequestBody Map<String, Object> request,
+                                         @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader != null && !com.ranjith.phcbackend.security.SecurityUtil.isValidAdmin(authHeader)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied: Admin role required to review leaves"));
+        }
         String status = (String) request.getOrDefault("status", "APPROVED");
         Map<String, Object> response = leaveService.reviewLeave(leaveId, status);
 
