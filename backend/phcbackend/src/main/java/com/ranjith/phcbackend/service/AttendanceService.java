@@ -58,12 +58,16 @@ public class AttendanceService {
     }
 
     public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy, LocalTime customCheckInTime, LocalTime shiftStartTime, Integer graceMinutes, Double livenessScore, String photoProof) {
+        return checkIn(doctorId, userLat, userLng, accuracy, null, customCheckInTime, shiftStartTime, graceMinutes, livenessScore, photoProof);
+    }
+
+    public String checkIn(Long doctorId, Double userLat, Double userLng, Double accuracy, LocalDate checkInDate, LocalTime customCheckInTime, LocalTime shiftStartTime, Integer graceMinutes, Double livenessScore, String photoProof) {
         if (doctorId == null) return "Invalid doctor ID";
         Optional<Doctor> doctorOptional = doctorRepository.findById(doctorId);
         if (doctorOptional.isEmpty()) return "Doctor not found";
 
         Doctor doctor = doctorOptional.get();
-        LocalDate today = LocalDate.now();
+        LocalDate today = checkInDate != null ? checkInDate : LocalDate.now();
 
         // Validate coordinate existence
         if (userLat == null || userLng == null) {
@@ -298,7 +302,13 @@ public class AttendanceService {
         LocalDate today = LocalDate.now();
 
         Optional<Attendance> attendanceOpt = attendanceRepository.findByDoctorAndDate(doctor, today);
-        if (attendanceOpt.isEmpty() || !"PRESENT".equals(attendanceOpt.get().getStatus())) {
+        if (attendanceOpt.isEmpty()) {
+            response.put("status", "NO_SESSION");
+            response.put("message", "No active check-in session found for today.");
+            return response;
+        }
+        String attStatus = attendanceOpt.get().getStatus();
+        if (!"PRESENT".equals(attStatus) && !"LATE".equals(attStatus)) {
             response.put("status", "NO_SESSION");
             response.put("message", "No active check-in session found for today.");
             return response;
@@ -441,7 +451,7 @@ public class AttendanceService {
             workedMinutes = java.time.Duration.between(attendance.getCheckInTime(), now).toMinutes();
         }
 
-        if (workedMinutes > 0 && workedMinutes < 240) { // Under 4 hours
+        if (workedMinutes < 240) { // Under 4 hours (including instant checkouts)
             attendance.setStatus("COMPLETED_EARLY");
             attendanceRepository.save(attendance);
             logAudit(doctor, "CHECK_OUT_ATTEMPT", null, null, null, null, "CHECK_OUT_SUCCESS", String.format("Checked out early after %d mins worked", workedMinutes));
@@ -638,6 +648,9 @@ public class AttendanceService {
         int newlyFlaggedAbsent = 0;
 
         for (Doctor doctor : doctors) {
+            if ("ADMIN".equalsIgnoreCase(doctor.getRole()) || doctor.getPhc() == null) {
+                continue; // Skip administrators and doctors without assigned PHC
+            }
             Optional<Attendance> existing = attendanceRepository.findByDoctorAndDate(doctor, today);
             if (existing.isEmpty()) {
                 boolean onApprovedLeave = leaveService != null && leaveService.isDoctorOnApprovedLeave(doctor, today);
@@ -667,6 +680,9 @@ public class AttendanceService {
         List<java.util.Map<String, Object>> alerts = new java.util.ArrayList<>();
 
         for (Doctor doctor : doctors) {
+            if ("ADMIN".equalsIgnoreCase(doctor.getRole()) || doctor.getPhc() == null) {
+                continue; // Skip administrators and unassigned doctors
+            }
             boolean onApprovedLeave = leaveService != null && leaveService.isDoctorOnApprovedLeave(doctor, today);
             if (onApprovedLeave) {
                 continue; // Skip doctors on approved leave from absentee alert list
@@ -744,8 +760,21 @@ public class AttendanceService {
                 }
             }
 
+            LocalDate eventDate = LocalDate.now();
+            if (rec.get("timestamp") != null) {
+                try {
+                    String ts = rec.get("timestamp").toString();
+                    if (ts.contains("T")) {
+                        eventDate = java.time.LocalDateTime.parse(ts).toLocalDate();
+                    } else if (ts.contains("-")) {
+                        String[] parts = ts.trim().split("\\s+");
+                        eventDate = LocalDate.parse(parts[0]);
+                    }
+                } catch (Exception e) {}
+            }
+
             if ("CHECK_IN".equalsIgnoreCase(eventType)) {
-                String checkInRes = checkIn(doctorId, lat, lng, accuracy, eventTime, LocalTime.of(9, 0), 15);
+                String checkInRes = checkIn(doctorId, lat, lng, accuracy, eventDate, eventTime, LocalTime.of(9, 0), 15, null, null);
                 if (checkInRes != null && checkInRes.startsWith("Check-in successful")) {
                     logAudit(doctor, "OFFLINE_SYNC_CHECK_IN", lat, lng, accuracy, null, "OFFLINE_SYNC_SUCCESS", "Offline check-in synced successfully");
                     res.put("status", "SUCCESS");

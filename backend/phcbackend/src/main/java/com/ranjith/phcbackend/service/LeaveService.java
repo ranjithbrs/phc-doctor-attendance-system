@@ -20,10 +20,18 @@ public class LeaveService {
 
     private final LeaveRequestRepository leaveRepository;
     private final DoctorRepository doctorRepository;
+    private final com.ranjith.phcbackend.repository.AttendanceRepository attendanceRepository;
 
-    public LeaveService(LeaveRequestRepository leaveRepository, DoctorRepository doctorRepository) {
+    public LeaveService(LeaveRequestRepository leaveRepository,
+                        DoctorRepository doctorRepository,
+                        @org.springframework.beans.factory.annotation.Autowired(required = false) com.ranjith.phcbackend.repository.AttendanceRepository attendanceRepository) {
         this.leaveRepository = leaveRepository;
         this.doctorRepository = doctorRepository;
+        this.attendanceRepository = attendanceRepository;
+    }
+
+    public LeaveService(LeaveRequestRepository leaveRepository, DoctorRepository doctorRepository) {
+        this(leaveRepository, doctorRepository, null);
     }
 
     public Map<String, Object> applyLeave(Long doctorId, String leaveType, LocalDate startDate, LocalDate endDate, String reason) {
@@ -87,6 +95,28 @@ public class LeaveService {
         leave.setStatus(updatedStatus);
         leave.setReviewedAt(LocalDateTime.now());
         leaveRepository.save(leave);
+
+        // Reconcile pre-existing ABSENT or blank records for this doctor across the approved date range
+        if ("APPROVED".equals(updatedStatus) && leave.getDoctor() != null && attendanceRepository != null) {
+            LocalDate cur = leave.getStartDate();
+            while (!cur.isAfter(leave.getEndDate())) {
+                var attOpt = attendanceRepository.findByDoctorAndDate(leave.getDoctor(), cur);
+                if (attOpt.isPresent()) {
+                    var att = attOpt.get();
+                    if ("ABSENT".equals(att.getStatus())) {
+                        att.setStatus("ON_LEAVE");
+                        attendanceRepository.save(att);
+                    }
+                } else {
+                    var att = new com.ranjith.phcbackend.model.Attendance();
+                    att.setDoctor(leave.getDoctor());
+                    att.setDate(cur);
+                    att.setStatus("ON_LEAVE");
+                    attendanceRepository.save(att);
+                }
+                cur = cur.plusDays(1);
+            }
+        }
 
         response.put("message", "Leave request " + updatedStatus.toLowerCase() + " successfully");
         response.put("leaveId", leave.getId());

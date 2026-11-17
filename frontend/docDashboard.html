@@ -107,34 +107,45 @@ document.getElementById("todayDate").innerText  = new Date().toDateString();
 // ===== MAP =====
 let map, userMarker, fenceCircle;
 
-function initMap(lat, lng) {
-  if (!map) {
-    map = L.map('map').setView([lat, lng], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    userMarker = L.marker([lat, lng]).addTo(map)
-      .bindPopup("📍 Your Live Position").openPopup();
-
-    fenceCircle = L.circle([lat, lng], {
-      color: '#2563eb', fillColor: '#60a5fa',
-      fillOpacity: 0.15, radius: 500
-    }).addTo(map);
-  } else {
-    map.setView([lat, lng], 15);
-    userMarker.setLatLng([lat, lng]);
-    fenceCircle.setLatLng([lat, lng]);
-  }
-}
-
 // Initial map center (Default PHC location)
 const DEFAULT_LAT = 11.0168;
 const DEFAULT_LNG = 76.9558;
 
+function initMap(userLat, userLng) {
+  const phcLat = DEFAULT_LAT;
+  const phcLng = DEFAULT_LNG;
+  if (!map) {
+    map = L.map('map').setView([phcLat, phcLng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    L.marker([phcLat, phcLng]).addTo(map)
+      .bindPopup("🏥 Assigned PHC Boundary").openPopup();
+
+    fenceCircle = L.circle([phcLat, phcLng], {
+      color: '#2563eb', fillColor: '#60a5fa',
+      fillOpacity: 0.15, radius: 500
+    }).addTo(map);
+
+    if (userLat && userLng) {
+      userMarker = L.marker([userLat, userLng]).addTo(map)
+        .bindPopup("📍 Your Live Position");
+    }
+  } else {
+    if (userLat && userLng) {
+      if (!userMarker) {
+        userMarker = L.marker([userLat, userLng]).addTo(map).bindPopup("📍 Your Live Position");
+      } else {
+        userMarker.setLatLng([userLat, userLng]);
+      }
+    }
+  }
+}
+
 // Initialize map with default center immediately on load
 document.addEventListener("DOMContentLoaded", () => {
-  initMap(DEFAULT_LAT, DEFAULT_LNG);
+  initMap();
   loadStatus();
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -162,7 +173,7 @@ function loadStatus() {
     .then(data => {
       const status = data && data.status ? data.status : "NOT_CHECKED";
       updateStatusUI(status);
-      if (status === "PRESENT" || status === "CHECKED_IN") {
+      if (status === "PRESENT" || status === "CHECKED_IN" || status === "LATE") {
         startPresenceHeartbeat();
       } else {
         stopPresenceHeartbeat();
@@ -174,11 +185,14 @@ function loadStatus() {
 function updateStatusUI(status) {
   const el = document.getElementById("statusText");
   const map = {
-    PRESENT:     { text: "✅ Checked In (Presence Verified)",  cls: "present" },
-    CHECKED_IN:  { text: "✅ Checked In (Presence Verified)",  cls: "present" },
-    COMPLETED:   { text: "🔵 Checked Out", cls: "present" },
-    CHECKED_OUT: { text: "🔵 Checked Out", cls: "present" },
-    ABSENT:      { text: "❌ Absent",       cls: "absent"  },
+    PRESENT:         { text: "✅ Checked In (Presence Verified)",  cls: "present" },
+    CHECKED_IN:      { text: "✅ Checked In (Presence Verified)",  cls: "present" },
+    LATE:            { text: "⚠️ Checked In (Late Arrival)",       cls: "present" },
+    COMPLETED:       { text: "🔵 Checked Out (Duty Completed)",   cls: "present" },
+    COMPLETED_EARLY: { text: "🔵 Checked Out (Early Departure)",   cls: "present" },
+    CHECKED_OUT:     { text: "🔵 Checked Out",                     cls: "present" },
+    ON_LEAVE:        { text: "🏖️ On Approved Leave",             cls: "present" },
+    ABSENT:          { text: "❌ Absent",                          cls: "absent"  },
   };
   const s = map[status] || { text: "❌ Not Checked In", cls: "absent" };
   el.textContent  = s.text;
@@ -369,10 +383,12 @@ document.getElementById("checkOutBtn").addEventListener("click", () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ doctorId: Number(doctorId) })
   })
-  .then(res => res.json())
-  .then(data => {
+  .then(async res => {
+    const data = await res.json();
     const msg = data.message || "";
-    const isError = msg.includes("Cannot") || msg.includes("failed") || msg.includes("No active") || msg.includes("Invalid") || msg.includes("Already");
+    const isError = !res.ok || msg.includes("Cannot") || msg.includes("failed") || 
+                    msg.includes("No active") || msg.includes("Invalid") || 
+                    msg.includes("Already") || msg.includes("No check-in");
     showAlert(msg, isError ? "danger" : "success");
     loadStatus();
     btn.innerHTML = "🔴 Check Out";

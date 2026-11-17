@@ -28,7 +28,7 @@ public class Attendance {
 
     private Double livenessScore;
 
-    @Column(length = 2000)
+    @Column(columnDefinition = "LONGTEXT")
     private String photoProof;
 
     @ManyToOne
