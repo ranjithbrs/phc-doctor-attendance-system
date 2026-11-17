@@ -111,8 +111,11 @@ function renderTable(records) {
 
   records.forEach(record => {
     let badgeClass = "badge-danger";
-    if (record.status === "PRESENT")   badgeClass = "badge-success";
-    if (record.status === "COMPLETED") badgeClass = "badge-primary";
+    if (record.status === "PRESENT") badgeClass = "badge-success";
+    else if (record.status === "COMPLETED") badgeClass = "badge-primary";
+    else if (record.status === "COMPLETED_EARLY") badgeClass = "badge-primary";
+    else if (record.status === "LATE") badgeClass = "badge-warning";
+    else if (record.status === "ON_LEAVE") badgeClass = "badge-secondary";
 
     tableBody.innerHTML += `
       <tr>

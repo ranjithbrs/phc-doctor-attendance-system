@@ -106,7 +106,11 @@ public class AttendanceController {
         }
 
         String result = attendanceService.checkOut(doctorId);
-        return ResponseEntity.ok(Map.of("message", result));
+        if (result != null && result.startsWith("Check-out successful")) {
+            return ResponseEntity.ok(Map.of("message", result));
+        } else {
+            return ResponseEntity.badRequest().body(Map.of("message", result));
+        }
     }
 
     // ===== MARK ABSENT =====

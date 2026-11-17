@@ -496,4 +496,62 @@ class AttendanceValidationTest {
         String invalidLng = attendanceService.checkIn(1L, 11.0, 195.0, 10.0);
         assertTrue(invalidLng.contains("Invalid longitude"));
     }
+
+    @Test
+    void testLateDoctorPresencePingVerified() {
+        // Fix 2 verification: A doctor who checked in LATE must still have presence verified
+        Attendance lateAttendance = new Attendance(LocalDate.now(), LocalTime.of(9, 30), null, "LATE", sampleDoctor);
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now())).thenReturn(Optional.of(lateAttendance));
+
+        Map<String, Object> response = attendanceService.presencePing(1L, 11.0168, 76.9558, 15.0);
+        assertEquals("VERIFIED", response.get("status"));
+        assertEquals("Continuous presence verified at Thudiyalur PHC (0m).", response.get("message"));
+    }
+
+    @Test
+    void testInstantCheckoutEarlyDepartureTransition() {
+        // Fix 4 verification: Checkout after 30 seconds (workedMinutes = 0) must transition to COMPLETED_EARLY, not full COMPLETED
+        Attendance presentAttendance = new Attendance(LocalDate.now(), LocalTime.now(), null, "PRESENT", sampleDoctor);
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, LocalDate.now())).thenReturn(Optional.of(presentAttendance));
+
+        String result = attendanceService.checkOut(1L);
+        assertTrue(result.contains("Early Departure"));
+        assertEquals("COMPLETED_EARLY", presentAttendance.getStatus());
+    }
+
+    @Test
+    void testAbsenteeCheckExcludesAdminAndUnassigned() {
+        // Fix 6 verification: Admin doctors and unassigned doctors must NOT be marked absent
+        Doctor adminDoc = new Doctor("Dr. Rajeswari", "admin@phc.gov.in", "pass", "Admin", "ADMIN", sampleDoctor.getPhc());
+        Doctor unassignedDoc = new Doctor("Dr. Unassigned", "unassigned@phc.gov.in", "pass", "Gen", "DOCTOR", null);
+
+        Mockito.when(doctorRepository.findAll()).thenReturn(List.of(adminDoc, unassignedDoc));
+
+        int newlyFlagged = attendanceService.runAutomatedAbsenteeCheck();
+        assertEquals(0, newlyFlagged);
+
+        List<Map<String, Object>> alerts = attendanceService.getAbsenteeAlerts();
+        assertTrue(alerts.isEmpty());
+    }
+
+    @Test
+    void testLeaveApprovalReconcilesAbsentAttendance() {
+        // Fix 8 verification: Approving leave reconciles existing ABSENT records to ON_LEAVE
+        LeaveRequestRepository leaveRepo = Mockito.mock(LeaveRequestRepository.class);
+        LeaveService leaveService = new LeaveService(leaveRepo, doctorRepository, attendanceRepository);
+
+        LocalDate today = LocalDate.now();
+        LeaveRequest leave = new LeaveRequest("CASUAL_LEAVE", today, today, "Sick", "PENDING", LocalDateTime.now(), sampleDoctor);
+        leave.setId(101L);
+
+        Mockito.when(leaveRepo.findById(101L)).thenReturn(Optional.of(leave));
+
+        Attendance absentAtt = new Attendance(today, null, null, "ABSENT", sampleDoctor);
+        Mockito.when(attendanceRepository.findByDoctorAndDate(sampleDoctor, today)).thenReturn(Optional.of(absentAtt));
+
+        Map<String, Object> reviewRes = leaveService.reviewLeave(101L, "APPROVED");
+        assertEquals("APPROVED", reviewRes.get("status"));
+        assertEquals("ON_LEAVE", absentAtt.getStatus(), "Existing ABSENT record must be updated to ON_LEAVE upon approval");
+        verify(attendanceRepository).save(absentAtt);
+    }
 }

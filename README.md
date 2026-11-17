@@ -3,7 +3,7 @@
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-GitHub%20Pages-brightgreen?style=for-the-badge&logo=githubpages&logoColor=white)](https://ranjithbrs.github.io/phc-doctor-attendance-system/)
 [![Backend Status](https://img.shields.io/badge/Backend-Render%20Cloud-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://phc-doctor-attendance-system.onrender.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
-[![Tests: 25 Passed](https://img.shields.io/badge/Tests-25%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](backend/phcbackend/src/test/java/com/ranjith/phcbackend/AttendanceValidationTest.java)
+[![Tests: 29 Passed](https://img.shields.io/badge/Tests-29%20Passed-brightgreen?style=for-the-badge&logo=junit5&logoColor=white)](backend/phcbackend/src/test/java/com/ranjith/phcbackend/AttendanceValidationTest.java)
 
 ---
 
